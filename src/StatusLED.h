@@ -16,9 +16,10 @@ class StatusLED {
         using ErrorFunctionType = void (*)(ErrorCode);
         ErrorFunctionType error;
         void updateLEDs(CameraState cameraState);
-    private:
+        void show();
         void writeColor(uint8_t r, uint8_t g, uint8_t b);
-        unsigned long lastStateUpdateTime = 0;
+    private:
+        unsigned long ledOnTime = 0;
         unsigned long lastLEDFlashUpdateTime = 0;
         bool ledFlashState = LOW;
         CameraState cameraState;

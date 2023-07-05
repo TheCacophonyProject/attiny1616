@@ -17,5 +17,14 @@ void writeCameraState(CameraState);
 void receiveEvent(int);
 void requestEvent();
 void error(ErrorCode);
+void wdtCountdown();
+void checkWDTCountdown();
+void powerOnPRi();
+void processButtonPress();
+void buttonWakeUp();
+void powerOnRPi();
+void powerOffRPi();
+void rtcWakeUp();
+void setupPIT();
 
 #endif // MAIN_H

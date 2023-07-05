@@ -3,10 +3,10 @@
 
 void StatusLED::updateLEDs(CameraState newState) {
   if (newState != cameraState) {
-    lastStateUpdateTime = millis();
+    ledOnTime = millis();
     cameraState = newState;
   }
-  if (millis() - lastStateUpdateTime > LED_ON_DURATION_MS) {
+  if (millis() - ledOnTime > LED_ON_DURATION_MS) {
     writeColor(0, 0, 0);
     return;
   }
@@ -25,11 +25,8 @@ void StatusLED::updateLEDs(CameraState newState) {
       break;
     case CameraState::POWER_ON_TIMEOUT:
       if (millis() - lastLEDFlashUpdateTime > LED_FLASH_DURATION_MS) {
-        if (ledFlashState) {
-          ledFlashState = LOW;
-        } else {
-          ledFlashState = HIGH;
-        }
+        ledFlashState = !ledFlashState;
+        lastLEDFlashUpdateTime = millis();
       }
       if (ledFlashState) {
         writeColor(255, 0, 0);
@@ -39,9 +36,12 @@ void StatusLED::updateLEDs(CameraState newState) {
       break;
     default:
       error(ErrorCode::INVALID_CAMERA_STATE);
-      //TODO make LED error blink
       break;
   }
+}
+
+void StatusLED::show() {
+  ledOnTime = millis();
 }
 
 void StatusLED::writeColor(uint8_t r, uint8_t g, uint8_t b) {

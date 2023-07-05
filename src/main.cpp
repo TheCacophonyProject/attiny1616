@@ -2,12 +2,16 @@
 #include <avr/sleep.h>
 #include <Wire.h>
 #include "main.h"
+#include <avr/wdt.h>
+#include <avr/interrupt.h> // Include the AVR interrupt library
+#include <avr/wdt.h> // Include the AVR watchdog timer library
+#include <avr/wdt.h>
+#include <avr/interrupt.h>
 
 #define VERSION 1
 
 //=====DEFINITIONS=====//
-#define POWER_ON_DURATION_MS 180000 // Duration of time to give the camera to power on and send a signal to the camera. 3 minutes 3 * 60 * 1000 = 180000
-
+#define BATTERY_HYSTERESIS 10          // The hysteresis for the battery voltage.  // TODO Make this configurable in I2C reg.
 
 //=====I2C DEFINITIONS=====//
 #define I2C_ADDRESS 0x25
@@ -19,11 +23,11 @@
 #define REG_CAMERA_STATE        0x02
 #define REG_RESET_WATCHDOG      0x03
 #define REG_TRIGGER_SLEEP       0x04
-#define REG_TRIGGER_SLEEP_DELAY 0x05
+//#define REG_TRIGGER_SLEEP_DELAY 0x05
 #define REG_CAMERA_WAKEUP       0x06
-#define REG_SLEEP_DURATION_MSB  0x07
-#define REG_SLEEP_DURATION_MID  0x08
-#define REG_SLEEP_DURATION_LSB  0x09
+//#define REG_SLEEP_DURATION_MSB  0x07
+//#define REG_SLEEP_DURATION_MID  0x08
+//#define REG_SLEEP_DURATION_LSB  0x09
 #define REG_BATTERY1            0x0A
 #define REG_BATTERY2            0x0B
 #define REG_BATTERY3            0x0C
@@ -31,10 +35,12 @@
 #define REG_BATTERY5            0x0E
 #define REG_RTC_BATTERY1        0x0F
 #define REG_RTC_BATTERY2        0x10
+#define REG_REQUEST_COMMUNICATION 0x11
 #define REG_ERRORS1             0x20
 #define REG_ERRORS2             0x21
 #define REG_ERRORS3             0x22
 #define REG_ERRORS4             0x23
+
 
 
 uint8_t registers[REG_LEN] = {0};
@@ -42,47 +48,63 @@ uint8_t writeMasks[REG_LEN] = {}; // Should all be initialised to 0xFF
 uint8_t registerAddress = 0;
 
 //=====GLOBAL VARIABLES=====//
-volatile unsigned long poweredOnTime = 0;       // Time from millis() from when the camera was powered on (5V enabled).
-//volatile unsigned long lastStateUpdateTime = 0; // Time from millis() when the camera state was last changed.
-volatile unsigned long sleepTimeStart = 0;      // Time when the camera was powered off.
-volatile unsigned long sleepCountdown = 0;      // Remaining time to sleep (in milliseconds).
-volatile uint16_t mainBatteryVoltage = 0;       // Raw reading value from ADC
-volatile uint16_t rtcBatteryVoltage = 0;        // Raw reading value from ADC
-volatile bool lowBatteryCheck = false;
-volatile uint16_t lowBatteryValue = 0;
-//volatile unsigned long lastLEDFlashUpdateTime = 0;  // Time from millis() when the LED was last updated when in a flash sequence.
-//volatile bool ledFlashState = LOW;                  // In an LED flash sequence is the LED ON or OFF.
+volatile unsigned long poweredOnTime = 0; // Time when the camera was powered on. Used to check for camera power on timeout.
+volatile uint16_t mainBatteryVoltage = 0; // Raw reading value from ADC
+volatile uint16_t rtcBatteryVoltage = 0;  // Raw reading value from ADC
+volatile bool lowBatteryCheck = false;    // Check main battery for a low battery condition.
+volatile uint16_t lowBatteryValue = 0;    // Value that triggers a low battery condition.
+volatile bool registersWrittenTo = false; // Flag to indicate that registers have been written to.
 
-// Different states that the camera is in.
+
+//======== TIMERS ==========//
+// Time from millis() of then the camera was powered on.
+// After 5 minutes a error code shoule be shown on the LED of the camera.
+// After 30 minutes the camera is reset and a POWERING_ON_TIMEOUT error flag is set in the I2C register.
+volatile unsigned long poweringOnTime = 0;
+#define MAX_POWERING_ON_DURATION_MS 300000
+
+// Time from millis() of when the camera WDT was reset.
+// If camera WDT is not reset for more than WDT_RESET_INTERVAL (5 minutes) then 
+// the camera is reset, assuming something went wrong on the camera causing it to freeze.
+// A error flag will also be set in the I2C register, so the camera can see and report the error.
+volatile unsigned long poweredOnWDTResetTime = 0;
+#define WDT_RESET_INTERVAL 300000
+
+// Time from millis() of when the camera asked to be turned off.
+// After a set about of time in ms the camera is defined from POWER_OFF_DELAY_MS it will then power off the camera.
+volatile unsigned long poweringOffTime = 0;
+#define POWER_OFF_DELAY_MS 30000
+
+// Timer to check that the ATtiny is woken up by the RTC_ALARM interrupt after at least 24 hours. 
+// If reaches MAX_POWERED_OFF_DURATION_MS then the camera is reset and a SLEEP_ error flag is set in the I2C register
+volatile unsigned long poweredOffTime = 0; 
+#define MAX_POWERED_OFF_DURATION_MS 86400000
+
+// Time from millis() of when the ATtiny requested communications from the Raspberry Pi.
+// If the Raspberry Pi is not hear from after REQUEST_COMMUNICATION_TIMEOUT_MS a error flag will be set in the I2C register.
+volatile unsigned long requestCommunicationTime = 0;
+#define REQUEST_COMMUNICATION_TIMEOUT_MS 300000
+
+
 volatile CameraState cameraState = CameraState::POWERING_ON;
 StatusLED statusLED;
 
-
 void setup() {
+  // Initialize Pins
   pinMode(LED_R, OUTPUT);
   pinMode(LED_G, OUTPUT);
   pinMode(LED_B, OUTPUT);
   pinMode(EN_5V, OUTPUT);
   pinMode(RTC_BAT_SENSE, INPUT);
   pinMode(MAIN_BAT_SENSE, INPUT);
-  pinMode(RTC_INT, INPUT);
+  pinMode(RTC_ALARM, INPUT);
   pinMode(BUTTON, INPUT_PULLUP);
-
-  digitalWrite(LED_R, LOW);
-  digitalWrite(LED_G, LOW);
-  digitalWrite(LED_B, LOW);
+  statusLED.writeColor(0, 0, 0);
   
-  //digitalWrite(EN_5V, LOW); //TODO
-
-  //TODO read in values from memory
-  //lowBatteryCheck
-  //lowBatteryValue
-  
-  //Check for low battery
-  //
-  
-
+  // Check for a low battery.
   checkMainBattery();
+
+  // Write I2C register write masks.
   for (int i = 0; i < REG_LEN; i++) {
     writeMasks[i] = 0xFF;
   }
@@ -93,36 +115,53 @@ void setup() {
   writeMasks[REG_RTC_BATTERY1] = 0x01 << 7;
   writeMasks[REG_RTC_BATTERY2] = 0x00;
   
+  // Write I2C initial register values.
   registers[REG_TYPE] = 0xCA;
   registers[REG_VERSION] = VERSION;
 
+  // Setup I2C
   Wire.begin(I2C_ADDRESS);
   Wire.onReceive(receiveEvent);
   Wire.onRequest(requestEvent);
 
+  // Setup interrupts
+  attachInterrupt(digitalPinToInterrupt(RTC_ALARM), rtcWakeUp, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON), buttonWakeUp, FALLING);
+  setupPIT(); // Wake up every 1 second.
+
+  // TODO initial wakeup sequence 
   //set_sleep_mode(SLEEP_MODE_PWR_DOWN);
   //sleep_enable();
 }
 
-volatile bool registersWrittenTo = false; // Flag to indicate that registers have been written to.
-
-void loop1() {
-
-}
-
 void loop() {
-  if (registersWrittenTo) { // Function that only get called when there has been an update to the registers.
+  // Check updates from I2C registers
+  if (registersWrittenTo) {
     registersWrittenTo = false;
     lowBatteryRegUpdate();
     mainBatteryRegUpdate();
     rtcBatteryRegUpdate();
     checkRegSleep();
+    // TODO checkRegCommunication();
   }
+
+  processButtonPress();
+
+  //checkWakeUpRegisters(); 
   checkMainBattery();
   checkCameraState();
-  statusLED.updateLEDs(cameraState);
+  checkWDTCountdown();
 
-  //sleep_cpu();  // put the MCU to sleep. It will wake up when an I2C request is received.
+  statusLED.updateLEDs(cameraState);
+  sleep_cpu();
+  // TODO detach interrupts then just enable before sleep?
+  //detachInterrupt(digitalPinToInterrupt(RTC_INT));
+}
+
+
+
+void checkWDTCountdown() {
+  //TODO Check if poweringOnWDTCountdown or poweredOnWDTCountdown or poweredOffWDTCountdown has reached 0.
 }
 
 void mainBatteryRegUpdate() {
@@ -143,12 +182,19 @@ void rtcBatteryRegUpdate() {
 
 void checkRegSleep() {
   if (registers[REG_TRIGGER_SLEEP] != 0) {
-    long delayDurationMs = uint32_t(registers[REG_TRIGGER_SLEEP_DELAY]) * 1000;
-    delay(delayDurationMs);
-    digitalWrite(EN_5V, LOW);
-    uint32_t sleepDurationSec = uint32_t(registers[REG_SLEEP_DURATION_MSB] << 16 | registers[REG_SLEEP_DURATION_MID] << 8 | registers[REG_SLEEP_DURATION_LSB]);
-    sleepTimeStart = millis();
-    sleepCountdown = sleepDurationSec * 1000;
+    cameraState = CameraState::POWERING_OFF;
+  }
+}
+
+void checkRegCommunication() {
+  if (registers[REG_REQUEST_COMMUNICATION] != 0 &&  millis() - requestCommunicationTime > REQUEST_COMMUNICATION_TIMEOUT_MS) {
+    // Timeout for raspberry pi communicating to attiny.
+    // TODO Set error flag in I2C register
+    registers[REG_REQUEST_COMMUNICATION] = 0;
+  }
+  if (registers[REG_REQUEST_COMMUNICATION] == 0) {
+    // If register is reset the ping pin can be reset also.
+    // TODO reset ping pin.
   }
 }
 
@@ -194,8 +240,46 @@ void checkMainBattery() {
     batteryVoltage += analogRead(MAIN_BAT_SENSE);
   }
   mainBatteryVoltage = batteryVoltage / samples;
-  //TODO Check against low battery value if set to do so.
+
+  // Check if battery voltage is OK.
+  if (lowBatteryCheck && (mainBatteryVoltage > lowBatteryValue || mainBatteryRegUpdate == 0)) {
+    return; // Battery is OK.
+  }
+
+  cameraState = CameraState::POWERED_OFF;
+  // TODO Disable 5V
+  
+  // Flash LED to show battery is low
+  for (int i = 0; i < 3; i++) {
+    statusLED.writeColor(0xFF, 0x00, 0x00);
+    delay(300);
+    statusLED.writeColor(0x00, 0x00, 0x00);
+    delay(300);  
+  }
+
+  // Loop checking battery voltage until battery is better
+  while (1) {
+    // Check main battery, making sure it reaches the threshold at least 10 times in a row.
+    bool lowbattery = false;
+    for (int i = 0; i < 10; i++) {
+      if (analogRead(MAIN_BAT_SENSE) < lowBatteryValue + BATTERY_HYSTERESIS) {
+        lowbattery = true;
+        break;
+      }
+    }
+    if (!lowbattery) {
+      return; // Battery is better again, return to normal loop.
+    }
+
+    // go to deep sleep.
+    // Wait for PIT to wake up again and then check battery. 
+  }
 }
+
+void waitForBatteryCharged() {
+  
+}
+
 
 void checkRTCBattery() {
   int samples = 10;
@@ -211,16 +295,25 @@ void checkCameraState() {
   if (registers[REG_CAMERA_STATE] <= static_cast<uint8_t>(CameraState::POWER_ON_TIMEOUT)) {
     writeCameraState(static_cast<CameraState>(registers[REG_CAMERA_STATE]));
   }
-  return;
-  // Check if the camera has finished sleeping.
-  if (cameraState == CameraState::POWERED_OFF && millis() - sleepTimeStart > sleepCountdown) {
-    writeCameraState(CameraState::POWERING_ON);
-    digitalWrite(EN_5V, HIGH);
-  }
 
   // Check if the camera has timedout to power on.
-  if (cameraState == CameraState::POWERING_ON && millis() - poweredOnTime > POWER_ON_DURATION_MS) {
+  if (cameraState == CameraState::POWERING_ON && millis() - poweredOnTime > MAX_POWERING_ON_DURATION_MS) {
     writeCameraState(CameraState::POWER_ON_TIMEOUT);
+    return;
+  }
+
+  // Check if the camera has had enough time to power off.
+  if (cameraState == CameraState::POWERING_OFF && millis() - poweringOffTime > POWER_OFF_DELAY_MS) {
+    // TODO disable 5V
+    writeCameraState(CameraState::POWERED_OFF);
+    return;
+  }
+
+  // Check if the sleep has timedout
+  if (cameraState == CameraState::POWERED_OFF && millis() - poweredOffTime > MAX_POWERED_OFF_DURATION_MS) {
+    // TODO error LED for RTC timeout
+    powerOnRPi();
+    return;
   }
 }
 
@@ -233,6 +326,8 @@ void writeCameraState(CameraState newCameraState) {
   registers[REG_CAMERA_STATE] = static_cast<uint8_t>(cameraState);
 }
 
+
+//============================== I2C FUNCTIONS ==============================//
 void receiveEvent(int howMany) {
   while(Wire.available()) {
     uint8_t address = Wire.read();
@@ -272,4 +367,76 @@ void receiveEvent(int howMany) {
 
 void requestEvent() {
   Wire.write(registers[registerAddress]);
+}
+
+//=============================ISR DEFINITIONS==================================//
+ISR(RTC_PIT_vect) {
+  RTC.PITINTFLAGS = RTC_PI_bm; // Clear interrupt flag, otherwise it will constantly trigger.
+}
+
+// Setup the RTC_PIT_interrupt to trigger every 1 second.
+void setupPIT() {
+  RTC.CLKSEL = RTC_CLKSEL_INT32K_gc; // Set clock source to the internal 32.768kHz oscillator
+  RTC.PITCTRLA = RTC_PITEN_bm | RTC_PERIOD_CYC32768_gc; // Enable PIT and set period to 1 second
+  RTC.PITINTCTRL = RTC_PI_bm; // Enable PIT interrupt
+}
+
+// Function attached to the pin connected to the alarm pin on the RTC.
+void rtcWakeUp() {
+  checkMainBattery();
+  powerOnRPi();
+  // TODO Wake up RP2040 
+}
+
+//======================= RASPBERRY_PI FUNCTIONS ============================//
+void powerOnRPi() {
+  checkMainBattery(); // Will stay in checkMainBattery until battery is good.
+  // TODO Enable 5V
+  cameraState = CameraState::POWERING_ON;
+  poweringOnTime = millis();
+}
+
+void poweringOffRPi() {
+  cameraState = CameraState::POWERING_OFF;
+  poweringOffTime = millis();
+}
+
+// request raspberry pi to start up wifi communications.
+void startWifiRPi() {
+  requestCommunicationTime = millis();
+  registers[REG_REQUEST_COMMUNICATION] = 0x01;
+  // TODO Drive RPi ping pin to low, how it triggers the RPi to read the registers.
+}
+
+//============================ BUTTON FUNCTIONS =============================//
+// Records the duration that the button was pressed.
+// If less than 50 then ignore, probably debounce.
+// From 50 to 2999, ask the RPi to start communications.
+// 3000 or above, shut down RPi then restart ATtiny1616 after 5 seconds.
+// After being processed the buttonPressDuration is reset to 0.
+volatile unsigned long buttonPressDuration = 0;
+
+// buttonWakeUp is function called by the interrupt of the falling edge of the button.
+void buttonWakeUp() {
+  unsigned long start = millis();
+  while (digitalRead(BUTTON) == LOW) {}
+  buttonPressDuration = millis() - start;
+}
+
+void processButtonPress() {
+  if (buttonPressDuration < 50) {
+    return;
+  } else if (buttonPressDuration < 3000) {
+    statusLED.show();
+    if (cameraState == CameraState::POWERED_OFF) {
+      powerOnRPi();
+    } else {
+      startWifiRPi();
+    }
+    statusLED.updateLEDs(cameraState);
+  } else {
+    wdt_enable(WDTO_15MS);  // enable the watchdog with shortest available timeout
+    while(1) {}
+    delay(5000);
+  }
 }
