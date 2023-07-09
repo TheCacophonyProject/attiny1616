@@ -26,5 +26,10 @@ void powerOnRPi();
 void powerOffRPi();
 void rtcWakeUp();
 void setupPIT();
+void checkPing();
+void powerRPiOffNow();
+void wdtRegUpdate();
+void checkWakeUpReg();
+void poweringOffRPi();
 
 #endif // MAIN_H
