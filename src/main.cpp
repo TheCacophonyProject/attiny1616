@@ -7,6 +7,7 @@
 #include <avr/wdt.h> // Include the AVR watchdog timer library
 #include <avr/wdt.h>
 #include <avr/interrupt.h>
+#include <timer.h>
 
 #define VERSION 1
 
@@ -55,23 +56,22 @@ volatile bool lowBatteryCheck = false;    // Check main battery for a low batter
 volatile uint16_t lowBatteryValue = 0;    // Value that triggers a low battery condition.
 volatile bool registersWrittenTo = false; // Flag to indicate that registers have been written to.
 
-
 //======== TIMERS ==========//
-// Time from millis() of then the camera was powered on.
+// Time from getPitTimeMillis() of then the camera was powered on.
 // After 5 minutes a error code shoule be shown on the LED of the camera.
 // After 30 minutes the camera is reset and a MAX_POWERING_ON_DURATION_MS error flag is set in the I2C register.
 volatile unsigned long poweringOnTime = 0;
 #define MAX_POWERING_ON_DURATION_MS 300000
 //#define MAX_POWERING_ON_DURATION_MS 10000
 
-// Time from millis() of when the camera WDT was reset.
+// Time from getPitTimeMillis() of when the camera WDT was reset.
 // If camera WDT is not reset for more than WDT_RESET_INTERVAL (5 minutes) then 
 // the camera is reset, assuming something went wrong on the camera causing it to freeze.
 // A error flag will also be set in the I2C register, so the camera can see and report the error.
 volatile unsigned long poweredOnWDTResetTime = 0;
 #define WDT_RESET_INTERVAL 30000
 
-// Time from millis() of when the camera asked to be turned off.
+// Time from getPitTimeMillis() of when the camera asked to be turned off.
 // After a set about of time in ms the camera is defined from POWER_OFF_DELAY_MS it will then power off the camera.
 volatile unsigned long poweringOffTime = 0;
 #define POWER_OFF_DELAY_MS 30000
@@ -81,7 +81,7 @@ volatile unsigned long poweringOffTime = 0;
 volatile unsigned long poweredOffTime = 0; 
 #define MAX_POWERED_OFF_DURATION_MS 86400000
 
-// Time from millis() of when the ATtiny requested communications from the Raspberry Pi.
+// Time from getPitTimeMillis() of when the ATtiny requested communications from the Raspberry Pi.
 // If the Raspberry Pi is not hear from after PING_PI_TIMEOUT a error flag will be set in the I2C register.
 volatile unsigned long pingPiTime = 0;
 #define PING_PI_TIMEOUT 30000
@@ -118,6 +118,7 @@ void setup() {
     writeMasks[i] = 0xFF;
   }
   writeMasks[REG_VERSION] = 0x00; 
+  writeMasks[REG_TYPE] = 0x00;
   writeMasks[REG_BATTERY3] = 0x03; // Only allow writing to bits to turn on or off battery check.
   writeMasks[REG_BATTERY1] = 0x01 << 7;
   writeMasks[REG_BATTERY2] = 0x00;
@@ -162,7 +163,7 @@ void loop() {
   checkWDTCountdown();
 
   statusLED.updateLEDs(cameraState);
-  //sleep_cpu();  //TODO Enable, enabling this seams to muck with millis(), maybe, maybe not.
+  //sleep_cpu();  //TODO Enable, enabling this seams to muck with getPitTimeMillis(), maybe, maybe not.
 }
 
 void writeErrorFlag(ErrorCode errorCode, bool flash = true) {
@@ -176,14 +177,14 @@ void checkWDTCountdown() {
   if (cameraState != CameraState::POWERED_ON && cameraState != CameraState::CONNECTED_TO_NETWORK) {
     return;
   }
-  if (millis() - poweredOnWDTResetTime > WDT_RESET_INTERVAL) {
+  if (getPitTimeMillis() - poweredOnWDTResetTime > WDT_RESET_INTERVAL) {
     writeErrorFlag(ErrorCode::WATCHDOG_TIMEOUT);
     powerRPiOffNow();
   }
 }
 
 void checkPing() {
-  if (registers[REG_PING_PI] != 0 &&  millis() - pingPiTime > PING_PI_TIMEOUT) {
+  if (registers[REG_PING_PI] != 0 &&  getPitTimeMillis() - pingPiTime > PING_PI_TIMEOUT) {
     // Timeout for raspberry pi communicating to attiny.
     writeErrorFlag(ErrorCode::NO_PING_RESPONSE);
     registers[REG_PING_PI] = 0;
@@ -258,20 +259,20 @@ void checkCameraState() {
   }
 
   // Check if the camera has had a power on timeout.
-  if (cameraState == CameraState::POWERING_ON && millis() - poweringOnTime > MAX_POWERING_ON_DURATION_MS) {
+  if (cameraState == CameraState::POWERING_ON && getPitTimeMillis() - poweringOnTime > MAX_POWERING_ON_DURATION_MS) {
     writeCameraState(CameraState::POWER_ON_TIMEOUT);
     writeErrorFlag(ErrorCode::POWER_ON_FAILED);
     return;
   }
 
   // Check if the camera has had enough time to power off.
-  if (cameraState == CameraState::POWERING_OFF && millis() - poweringOffTime > POWER_OFF_DELAY_MS) {
+  if (cameraState == CameraState::POWERING_OFF && getPitTimeMillis() - poweringOffTime > POWER_OFF_DELAY_MS) {
     powerRPiOffNow();
     return;
   }
 
   // Check if the device has been in sleep for too long.
-  if (cameraState == CameraState::POWERED_OFF && millis() - poweredOffTime > MAX_POWERED_OFF_DURATION_MS) {
+  if (cameraState == CameraState::POWERED_OFF && getPitTimeMillis() - poweredOffTime > MAX_POWERED_OFF_DURATION_MS) {
     writeErrorFlag(ErrorCode::RTC_TIMEOUT);
     powerOnRPi();
     return;
@@ -280,7 +281,7 @@ void checkCameraState() {
 
 void writeCameraState(CameraState newCameraState) {
   if (newCameraState != cameraState) {
-    poweredOnWDTResetTime = millis();
+    poweredOnWDTResetTime = getPitTimeMillis();
     cameraState = newCameraState;
     statusLED.updateLEDs(cameraState);
   }
@@ -298,7 +299,7 @@ void checkWakeUpReg() {
 void wdtRegUpdate() {
   if (registers[REG_RESET_WATCHDOG] != 0) {
     registers[REG_RESET_WATCHDOG] = 0;
-    poweredOnWDTResetTime = millis();
+    poweredOnWDTResetTime = getPitTimeMillis();
   }
 }
 
@@ -396,17 +397,6 @@ void requestEvent() {
 }
 
 //=============================ISR DEFINITIONS==================================//
-ISR(RTC_PIT_vect) {
-  RTC.PITINTFLAGS = RTC_PI_bm; // Clear interrupt flag, otherwise it will constantly trigger.
-}
-
-// Setup the RTC_PIT_interrupt to trigger every 1 second.
-void setupPIT() {
-  RTC.CLKSEL = RTC_CLKSEL_INT32K_gc; // Set clock source to the internal 32.768kHz oscillator
-  RTC.PITCTRLA = RTC_PITEN_bm | RTC_PERIOD_CYC32768_gc; // Enable PIT and set period to 1 second
-  RTC.PITINTCTRL = RTC_PI_bm; // Enable PIT interrupt
-}
-
 // Function attached to the pin connected to the alarm pin on the RTC.
 void rtcWakeUp() {
   if (cameraState == CameraState::POWERED_OFF) {
@@ -421,22 +411,22 @@ void powerOnRPi() {
   checkMainBattery(); // Will stay in checkMainBattery until battery is good.
   digitalWrite(EN_5V, HIGH);
   writeCameraState(CameraState::POWERING_ON);
-  poweringOnTime = millis();
+  poweringOnTime = getPitTimeMillis();
 }
 
 void poweringOffRPi() {
   writeCameraState(CameraState::POWERING_OFF);
-  poweringOffTime = millis();
+  poweringOffTime = getPitTimeMillis();
 }
 
 void powerRPiOffNow() {
   writeCameraState(CameraState::POWERED_OFF);
-  digitalWrite(EN_5V, LOW);
+  //digitalWrite(EN_5V, LOW);
 }
 
 // request raspberry pi to start up wifi communications.
 void startWifiRPi() {
-  pingPiTime = millis();
+  pingPiTime = getPitTimeMillis();
   registers[REG_PING_PI] = 0x01;                // Will be reset by raspberry pi to 0x00
   registers[REG_REQUEST_COMMUNICATION] = 0x01;  // Will be reset by raspberry pi to 0x00
 }
@@ -451,9 +441,9 @@ volatile unsigned long buttonPressDuration = 0;
 
 // buttonWakeUp is function called by the interrupt of the falling edge of the button.
 void buttonWakeUp() {
-  unsigned long start = millis();
+  unsigned long start = getPitTimeMillis();
   while (digitalRead(BUTTON) == LOW) {}
-  buttonPressDuration = millis() - start;
+  buttonPressDuration = getPitTimeMillis() - start;
 }
 
 void processButtonPress() {
