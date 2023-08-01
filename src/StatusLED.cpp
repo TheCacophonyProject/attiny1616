@@ -1,10 +1,20 @@
 #include "Arduino.h"
 #include "StatusLED.h"
 
-void StatusLED::updateLEDs(CameraState newState) {
+#define GREEN 0x00FF00
+#define RED 0xFF0000
+#define BLUE 0x0000FF
+#define YELLOW 0xFF8300
+#define LED_OFF 0x000000
+
+void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnectionState) {
   if (newState != cameraState) {
     ledOnTime = millis();
     cameraState = newState;
+  }
+  if (newConnectionState != connectionState) {
+    ledOnTime = millis();
+    connectionState = newConnectionState;
   }
 
   if (flashing) {  
@@ -38,29 +48,41 @@ void StatusLED::updateLEDs(CameraState newState) {
   }
   switch (cameraState) {
     case CameraState::POWERING_ON:
-      writeColor(255, 0, 0);  // Red
-      break;
-    case CameraState::POWERED_ON:
-      writeColor(0, 0, 255); // Blue
+      writeColor(RED);
       break;
     case CameraState::POWERING_OFF:
-      writeColor(255, 255, 0);  // Yellow
+      writeColor(YELLOW);
       break;
     case CameraState::POWERED_OFF:
-      writeColor(0, 0, 0);  // OFF
-      break;
-    case CameraState::CONNECTED_TO_NETWORK:
-      writeColor(0, 255, 0);  // Green
+      writeColor(LED_OFF);
       break;
     case CameraState::POWER_ON_TIMEOUT:
+      // TODO tidy up flash code
       if (millis() - lastLEDFlashUpdateTime > LED_FLASH_DURATION_MS) {
         ledFlashState = !ledFlashState;
         lastLEDFlashUpdateTime = millis();
       }
       if (ledFlashState) {
-        writeColor(255, 0, 0);
+        writeColor(RED);
       } else {
-        writeColor(0, 0, 0);
+        writeColor(LED_OFF);
+      }
+      break;
+    
+    case CameraState::POWERED_ON:
+      switch (connectionState) {
+        case CameraConnectionState::NO_CONNECTION:
+          writeColor(BLUE);
+          break;
+        case CameraConnectionState::CONNECTED_TO_WIFI:
+          writeColor(GREEN);
+          break;
+        case CameraConnectionState::HOSTING_HOTSPOT:
+          writeColor(YELLOW);
+          break;
+        default:
+          error(ErrorCode::INVALID_CAMERA_STATE);
+          break;
       }
       break;
     default:
@@ -97,9 +119,14 @@ void StatusLED::show() {
   ledOnTime = millis();
 }
 
+void StatusLED::writeColor(uint32_t color) {
+  writeColor((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF);
+}
+
 void StatusLED::writeColor(uint8_t r, uint8_t g, uint8_t b) {
   // Low is on and High is off so am flipping the bits.
   analogWrite(LED_R, uint8_t(~r));
   analogWrite(LED_G, uint8_t(~g));
   analogWrite(LED_B, uint8_t(~b));
 }
+

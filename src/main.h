@@ -31,5 +31,7 @@ void powerRPiOffNow();
 void wdtRegUpdate();
 void checkWakeUpReg();
 void poweringOffRPi();
+void updateLEDs();
+void writeErrorFlag(ErrorCode, bool);
 
 #endif // MAIN_H

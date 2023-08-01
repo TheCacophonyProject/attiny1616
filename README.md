@@ -8,7 +8,7 @@
 
 ### Programming from RPi
 - `sudo apt install python3-pip -y`
-- `pip install pymcuprog`
+- `sudo pip install pymcuprog`
 - Free up UART to be used for UPDI connection. Add `dtoverlay=disable-bt` to the end of `/boot/config.txt`
 - Disable UART outputting to console: Remove `console=serial0,115200` from `/boot/cmdline.txt` and reboot.
 - Ping `sudo pymcuprog -d attiny1616 -t uart -u /dev/serial0 ping`

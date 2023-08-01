@@ -17,13 +17,15 @@
 class StatusLED {
     public:
         void error(ErrorCode);
-        void updateLEDs(CameraState);
+        void updateLEDs(CameraState, CameraConnectionState);
         void show();
+        void writeColor(uint32_t color);
         void writeColor(uint8_t r, uint8_t g, uint8_t b);
         void showError(ErrorCode);
         void flash(uint8_t, unsigned long, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t);
     private:
         CameraState cameraState;
+        CameraConnectionState connectionState;
         unsigned long ledOnTime = 0;
         unsigned long lastLEDFlashUpdateTime = 0;
         bool ledFlashState = LOW;

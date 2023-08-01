@@ -1,5 +1,7 @@
 ## I2C Register Map
 
+This document is out of date.
+
 ### Register 0x00 - REG_VERSION
 Coded [x]
 Tested []

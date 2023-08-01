@@ -11,32 +11,31 @@
 #define VERSION 1
 
 //=====DEFINITIONS=====//
-#define BATTERY_HYSTERESIS 10          // The hysteresis for the battery voltage.  // TODO Make this configurable in I2C reg.
+#define BATTERY_HYSTERESIS 10          // The hysteresis for the battery voltage.
 
 //=====I2C DEFINITIONS=====//
 #define I2C_ADDRESS 0x25
 #define REG_LEN     0x24
 
 // Check registers.md for details on registers functions.
-#define REG_VERSION             0x00
-#define REG_TYPE                0x01
+#define REG_TYPE                0x00
+#define REG_VERSION             0x01
 #define REG_CAMERA_STATE        0x02
-#define REG_RESET_WATCHDOG      0x03
-#define REG_TRIGGER_SLEEP       0x04
-//#define REG_TRIGGER_SLEEP_DELAY 0x05
+#define REG_CAMERA_CONNECTION   0x03
+#define REG_RESET_WATCHDOG      0x04
+#define REG_TRIGGER_SLEEP       0x05
 #define REG_CAMERA_WAKEUP       0x06
-//#define REG_SLEEP_DURATION_MSB  0x07
-//#define REG_SLEEP_DURATION_MID  0x08
-//#define REG_SLEEP_DURATION_LSB  0x09
-#define REG_BATTERY1            0x0A
-#define REG_BATTERY2            0x0B
-#define REG_BATTERY3            0x0C
-#define REG_BATTERY4            0x0D
-#define REG_BATTERY5            0x0E
-#define REG_RTC_BATTERY1        0x0F
-#define REG_RTC_BATTERY2        0x10
-#define REG_REQUEST_COMMUNICATION 0x11
-#define REG_PING_PI            0x12
+#define REG_REQUEST_COMMUNICATION 0x07
+#define REG_PING_PI               0x08
+
+#define REG_BATTERY1            0x10
+#define REG_BATTERY2            0x11
+#define REG_BATTERY3            0x12
+#define REG_BATTERY4            0x13
+#define REG_BATTERY5            0x14
+#define REG_RTC_BATTERY1        0x15
+#define REG_RTC_BATTERY2        0x16
+
 #define REG_ERRORS1             0x20
 #define REG_ERRORS2             0x21
 #define REG_ERRORS3             0x22
@@ -69,7 +68,8 @@ volatile unsigned long poweringOnTime = 0;
 // the camera is reset, assuming something went wrong on the camera causing it to freeze.
 // A error flag will also be set in the I2C register, so the camera can see and report the error.
 volatile unsigned long poweredOnWDTResetTime = 0;
-#define WDT_RESET_INTERVAL 30000
+//#define WDT_RESET_INTERVAL 30000
+#define WDT_RESET_INTERVAL 3000000
 
 // Time from millis() of when the camera asked to be turned off.
 // After a set about of time in ms the camera is defined from POWER_OFF_DELAY_MS it will then power off the camera.
@@ -118,6 +118,7 @@ void setup() {
     writeMasks[i] = 0xFF;
   }
   writeMasks[REG_VERSION] = 0x00; 
+  writeMasks[REG_TYPE] = 0x00;
   writeMasks[REG_BATTERY3] = 0x03; // Only allow writing to bits to turn on or off battery check.
   writeMasks[REG_BATTERY1] = 0x01 << 7;
   writeMasks[REG_BATTERY2] = 0x00;
@@ -161,19 +162,27 @@ void loop() {
   checkPing();
   checkWDTCountdown();
 
-  statusLED.updateLEDs(cameraState);
+  updateLEDs();
   //sleep_cpu();  //TODO Enable, enabling this seams to muck with millis(), maybe, maybe not.
 }
 
+void updateLEDs() {
+  statusLED.updateLEDs(cameraState, static_cast<CameraConnectionState>(registers[REG_CAMERA_CONNECTION]));
+}
+
 void writeErrorFlag(ErrorCode errorCode, bool flash = true) {
-  //TODO write error flag to I2C reg
+  uint8_t errorCodeUint = static_cast<uint8_t>(errorCode);
+  uint8_t regOffset = errorCodeUint/8;
+  uint8_t reg = REG_ERRORS1 + regOffset;
+  registers[reg] |= (1 << (errorCodeUint%8));
+  // TODO save error registers to EEPROM so can be restored on reboot 
   if (flash) {
     statusLED.error(errorCode);
   }
 }
 
 void checkWDTCountdown() {
-  if (cameraState != CameraState::POWERED_ON && cameraState != CameraState::CONNECTED_TO_NETWORK) {
+  if (cameraState != CameraState::POWERED_ON) {
     return;
   }
   if (millis() - poweredOnWDTResetTime > WDT_RESET_INTERVAL) {
@@ -234,7 +243,7 @@ void checkMainBattery() {
       return; // Battery is better again, return to normal loop.
     }
 
-    // go to deep sleep.
+    // TODO go to deep sleep.
     // Wait for PIT to wake up again and then check battery. 
   }
 }
@@ -282,7 +291,7 @@ void writeCameraState(CameraState newCameraState) {
   if (newCameraState != cameraState) {
     poweredOnWDTResetTime = millis();
     cameraState = newCameraState;
-    statusLED.updateLEDs(cameraState);
+    updateLEDs();
   }
   registers[REG_CAMERA_STATE] = static_cast<uint8_t>(cameraState);
 }
@@ -391,6 +400,9 @@ void receiveEvent(int howMany) {
   }
 }
 
+// Best to just read one register at a time, this is explained further in this example.
+// https://github.com/SpenceKonde/megaTinyCore/blob/master/megaavr/libraries/Wire/examples/register_model/register_model.ino
+// TODO Set it up so it 
 void requestEvent() {
   Wire.write(registers[registerAddress]);
 }
@@ -459,16 +471,16 @@ void buttonWakeUp() {
 void processButtonPress() {
   if (buttonPressDuration < 50) {
     return;
-  } else if (buttonPressDuration < 3000) {
+  } else if (buttonPressDuration < 2000) {
     statusLED.show();
     if (cameraState == CameraState::POWERED_OFF) {
       powerOnRPi();
     } else {
       startWifiRPi();
     }
-    statusLED.updateLEDs(cameraState);
+    updateLEDs();
   } else {
-    wdt_enable(WDTO_15MS);  // enable the watchdog with shortest available timeout
+    wdt_enable(WDTO_15MS);  // enable the watchdog with shortest available timeout, this will make the attiny reboot.
     while(1) {}
   }
 }
