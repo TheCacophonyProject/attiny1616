@@ -5,6 +5,7 @@
 #include "Pinout.h"
 #include "StatusLED.h"
 #include "ErrorCodes.h"
+#include "timer.h"
 
 void checkMainBattery();
 void lowBatteryRegUpdate();
@@ -25,7 +26,6 @@ void buttonWakeUp();
 void powerOnRPi();
 void powerOffRPi();
 void rtcWakeUp();
-void setupPIT();
 void checkPing();
 void powerRPiOffNow();
 void wdtRegUpdate();

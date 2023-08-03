@@ -1,5 +1,6 @@
 #include "Arduino.h"
 #include "StatusLED.h"
+#include "timer.h"
 
 #define GREEN 0x00FF00
 #define RED 0xFF0000
@@ -9,17 +10,17 @@
 
 void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnectionState) {
   if (newState != cameraState) {
-    ledOnTime = millis();
+    ledOnTime = getPitTimeMillis();
     cameraState = newState;
   }
   if (newConnectionState != connectionState) {
-    ledOnTime = millis();
+    ledOnTime = getPitTimeMillis();
     connectionState = newConnectionState;
   }
 
   if (flashing) {  
-    if (millis() - lastLEDFlashUpdateTime > flashDelay) {
-      lastLEDFlashUpdateTime = millis();
+    if (getPitTimeMillis() - lastLEDFlashUpdateTime > flashDelay) {
+      lastLEDFlashUpdateTime = getPitTimeMillis();
       flashDelay = LED_FLASH_ON_DURATION_MS;
       ledFlashState = !ledFlashState;
       if (ledFlashState) { 
@@ -35,14 +36,14 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
       flashSequenceCount = 0;
       ledFlashState = LOW;
 
-      if (millis() - flashStartTime > flashDuration) {
+      if (getPitTimeMillis() - flashStartTime > flashDuration) {
         flashing = false;
       }
     }
     return;
   }
   
-  if (millis() - ledOnTime > LED_ON_DURATION_MS) {
+  if (getPitTimeMillis() - ledOnTime > LED_ON_DURATION_MS) {
     writeColor(0, 0, 0);
     return;
   }
@@ -57,10 +58,9 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
       writeColor(LED_OFF);
       break;
     case CameraState::POWER_ON_TIMEOUT:
-      // TODO tidy up flash code
-      if (millis() - lastLEDFlashUpdateTime > LED_FLASH_DURATION_MS) {
+      if (getPitTimeMillis() - lastLEDFlashUpdateTime > LED_FLASH_DURATION_MS) {
         ledFlashState = !ledFlashState;
-        lastLEDFlashUpdateTime = millis();
+        lastLEDFlashUpdateTime = getPitTimeMillis();
       }
       if (ledFlashState) {
         writeColor(RED);
@@ -108,7 +108,7 @@ void StatusLED::flash(uint8_t flashLen, unsigned long duration, uint8_t r1, uint
 
   flashing = true;
   flashSequenceCount = 0;
-  flashStartTime = millis();
+  flashStartTime = getPitTimeMillis();
 }
 
 void StatusLED::error(ErrorCode error) {
@@ -116,7 +116,7 @@ void StatusLED::error(ErrorCode error) {
 }
 
 void StatusLED::show() {
-  ledOnTime = millis();
+  ledOnTime = getPitTimeMillis();
 }
 
 void StatusLED::writeColor(uint32_t color) {
