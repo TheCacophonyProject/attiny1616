@@ -139,7 +139,8 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(BUTTON), buttonWakeUp, FALLING);
   setupPIT(); // Wake up every 1 second.
 
-  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  set_sleep_mode(SLEEP_MODE_IDLE);
+  // set_sleep_mode(SLEEP_MODE_PWR_DOWN);
   sleep_enable();
   powerOnRPi();
 }
@@ -182,6 +183,7 @@ void writeErrorFlag(ErrorCode errorCode, bool flash = true) {
 }
 
 void checkWDTCountdown() {
+  // Only want to have watchdog running when camera is powered on.
   if (cameraState != CameraState::POWERED_ON) {
     return;
   }
@@ -329,8 +331,8 @@ void rtcBatteryRegUpdate() {
 
 void checkRegSleep() {
   if (registers[REG_TRIGGER_SLEEP] != 0) {
-    poweringOffRPi();
     registers[REG_TRIGGER_SLEEP] = 0;
+    poweringOffRPi();
   }
 }
 
@@ -432,7 +434,7 @@ void poweringOffRPi() {
 
 void powerRPiOffNow() {
   writeCameraState(CameraState::POWERED_OFF);
-  //digitalWrite(EN_5V, LOW);
+  digitalWrite(EN_5V, LOW);
 }
 
 // request raspberry pi to start up wifi communications.
