@@ -3,22 +3,20 @@
 #include <Wire.h>
 #include "main.h"
 #include <avr/wdt.h>
-#include <avr/interrupt.h> // Include the AVR interrupt library
-#include <avr/wdt.h> // Include the AVR watchdog timer library
-#include <avr/wdt.h>
 #include <avr/interrupt.h>
 #include <timer.h>
+#include <avr/io.h>
 
 #define VERSION 1
 
 //=====DEFINITIONS=====//
-#define BATTERY_HYSTERESIS 10          // The hysteresis for the battery voltage.
+#define BATTERY_HYSTERESIS 10
 
 //=====I2C DEFINITIONS=====//
 #define I2C_ADDRESS 0x25
 #define REG_LEN     0x24
 
-// Check registers.md for details on registers functions.
+// Check registers.md for details on registers functions. //TODO, update registers.md
 #define REG_TYPE                0x00
 #define REG_VERSION             0x01
 #define REG_CAMERA_STATE        0x02
@@ -90,6 +88,8 @@ volatile unsigned long pingPiTime = 0;
 volatile CameraState cameraState = CameraState::POWERING_ON;
 StatusLED statusLED;
 
+volatile bool quickFlash = false;
+
 void setup() {
   // Initialize Pins
   pinMode(LED_R, OUTPUT);
@@ -101,6 +101,7 @@ void setup() {
   pinMode(MAIN_BAT_SENSE, INPUT);
   pinMode(RTC_ALARM, INPUT_PULLUP);
   pinMode(BUTTON, INPUT_PULLUP);
+  pinMode(PI_SHUTDOWN, INPUT_PULLUP);
   statusLED.writeColor(0, 0, 0);
   
   // Check for a low battery.
@@ -136,16 +137,23 @@ void setup() {
 
   // Setup interrupts
   attachInterrupt(digitalPinToInterrupt(RTC_ALARM), rtcWakeUp, FALLING);
-  attachInterrupt(digitalPinToInterrupt(BUTTON), buttonWakeUp, FALLING);
   setupPIT(); // Wake up every 1 second.
 
   set_sleep_mode(SLEEP_MODE_IDLE);
-  // set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  // set_sleep_mode(SLEEP_MODE_PWR_DOWN); // PWM LED signals don't work in this power mode. //TODO Use this power mode when LEDs are solid or not on.
   sleep_enable();
   powerOnRPi();
 }
 
 void loop() {
+  if (quickFlash) {
+    statusLED.writeColor(255, 255, 255);
+    delay(20);
+    statusLED.writeColor(0, 0, 0);
+    quickFlash = false;
+  }
+
+  // TODO Check this only when needed.
   // Check updates from I2C registers
   //if (registersWrittenTo) {
   //  registersWrittenTo = false;
@@ -156,6 +164,8 @@ void loop() {
   wdtRegUpdate();
   checkWakeUpReg();
   //}
+
+  buttonWakeUp();
 
   processButtonPress();
   checkMainBattery();
@@ -275,6 +285,15 @@ void checkCameraState() {
     return;
   }
 
+  // Check if the camera has powered off.
+  if (cameraState == CameraState::POWERING_OFF) {
+    // gpio-poweroff in config.txt for the RPi will drive a pin low when it powers off.
+    if (digitalRead(PI_SHUTDOWN) == LOW) {
+      powerRPiOffNow();
+    }
+  }
+
+  // TODO replace this with a shutdown timeout, as power off will be triggered from the PI_SHUTDOWN pin.
   // Check if the camera has had enough time to power off.
   if (cameraState == CameraState::POWERING_OFF && getPitTimeMillis() - poweringOffTime > POWER_OFF_DELAY_MS) {
     powerRPiOffNow();
@@ -407,6 +426,7 @@ void receiveEvent(int howMany) {
 // TODO Set it up so it 
 void requestEvent() {
   Wire.write(registers[registerAddress]);
+  //quickFlash = true;
 }
 
 //=============================ISR DEFINITIONS==================================//
@@ -454,9 +474,17 @@ volatile unsigned long buttonPressDuration = 0;
 
 // buttonWakeUp is function called by the interrupt of the falling edge of the button.
 void buttonWakeUp() {
+  if (digitalRead(BUTTON) == HIGH) {{
+    return;
+  }}
   unsigned long start = getPitTimeMillis();
-  while (digitalRead(BUTTON) == LOW) {}
+  while (digitalRead(BUTTON) == LOW) {
+    statusLED.writeColor(0xFFFFFF);
+    delay(1);
+  }
+  updateLEDs();
   buttonPressDuration = getPitTimeMillis() - start;
+  //registers[0x19] = buttonPressDuration/100;
 }
 
 void processButtonPress() {
@@ -471,7 +499,16 @@ void processButtonPress() {
     }
     updateLEDs();
   } else {
-    wdt_enable(WDTO_15MS);  // enable the watchdog with shortest available timeout, this will make the attiny reboot.
-    while(1) {}
+    statusLED.writeColor(0x000000);
+    digitalWrite(EN_5V, LOW);
+    delay(5000);
+
+    // Set timeout to 8ms, section 19.6.1 of datasheet.
+    CCP = CCP_IOREG_gc;
+    WDT.CTRLA = 1;
+
+    while(1) {
+      // Waiting for WDT to trigger. This is the easiest way to get a reboot from the ATtiny
+    }
   }
 }
