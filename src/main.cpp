@@ -72,7 +72,7 @@ volatile unsigned long poweredOnWDTResetTime = 0;
 // Time from getPitTimeMillis() of when the camera asked to be turned off.
 // After a set about of time in ms the camera is defined from POWER_OFF_DELAY_MS it will then power off the camera.
 volatile unsigned long poweringOffTime = 0;
-#define POWER_OFF_DELAY_MS 30000
+#define POWER_OFF_DELAY_MS 60000
 
 // Timer to check that the ATtiny is woken up by the RTC_ALARM interrupt after at least 24 hours. 
 // If reaches MAX_POWERED_OFF_DURATION_MS then the camera is reset and a SLEEP_ error flag is set in the I2C register
@@ -288,6 +288,7 @@ void checkCameraState() {
   // Check if the camera has powered off.
   if (cameraState == CameraState::POWERING_OFF) {
     // gpio-poweroff in config.txt for the RPi will drive a pin low when it powers off.
+    // TODO Check if you need to wait here for a second or two for the flash to finish writing.
     if (digitalRead(PI_SHUTDOWN) == LOW) {
       powerRPiOffNow();
     }
