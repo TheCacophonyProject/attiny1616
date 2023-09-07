@@ -19,7 +19,7 @@ script:
 
 deploy:
   provider: releases
-  api_key: $GITHUB_OAUTH_TOKEN
+  api_key: $GITHUB_TOKEN
   file:
     - ".pio/build/ATtiny1616/firmware.hex"
   skip_cleanup: true
