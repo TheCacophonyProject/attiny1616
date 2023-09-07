@@ -294,6 +294,12 @@ void checkCameraState() {
     }
   }
 
+  if (cameraState == CameraState::POWERED_ON && digitalRead(PI_SHUTDOWN) == LOW) {
+    powerRPiOffNow();
+    delay(1000);
+    powerOnRPi();
+  }
+
   // TODO replace this with a shutdown timeout, as power off will be triggered from the PI_SHUTDOWN pin.
   // Check if the camera has had enough time to power off.
   if (cameraState == CameraState::POWERING_OFF && getPitTimeMillis() - poweringOffTime > POWER_OFF_DELAY_MS) {
