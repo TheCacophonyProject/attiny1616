@@ -10,6 +10,7 @@ cache:
     - $HOME/.cache/pip
 
 install:
+  - pip install urllib3==1.26.15
   - pip install -U platformio
   - pio update
 
