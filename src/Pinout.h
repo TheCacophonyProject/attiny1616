@@ -12,5 +12,6 @@
 #define BUTTON          PIN_PA6   // Connected to the button on the case.
 #define PING_PIN        PIN_PB2
 #define PI_SHUTDOWN     PIN_PA7   // Raspberry Pi will drive this pin low when it has finished powering off.
+#define EN_RP2040       PIN_PA1   // Drive low to power on rp2040.
 
 #endif

@@ -97,6 +97,7 @@ void setup() {
   pinMode(LED_B, OUTPUT);
   pinMode(EN_5V, OUTPUT);
   digitalWrite(EN_5V, HIGH);
+  pinMode(EN_RP2040, OUTPUT);
   pinMode(RTC_BAT_SENSE, INPUT);
   pinMode(MAIN_BAT_SENSE, INPUT);
   pinMode(RTC_ALARM, INPUT_PULLUP);
@@ -104,6 +105,8 @@ void setup() {
   pinMode(PI_SHUTDOWN, INPUT_PULLUP);
   statusLED.writeColor(0, 0, 0);
   
+  digitalWrite(EN_RP2040, LOW);
+
   // Check for a low battery.
   checkMainBattery();
 
