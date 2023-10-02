@@ -1,6 +1,4 @@
 #include <Arduino.h>
-#include "timer.h"
-
 
 volatile unsigned long pitTime = 0;
 
@@ -24,9 +22,8 @@ unsigned long getPitTime() {
 }
 
 unsigned long getPitTimeMillis() {
-  noInterrupts();
+  //return millis();
   unsigned long time = getPitTime();
-  interrupts();
   time = time * 63;   // Multiply by 63 to get milliseconds (1000/16 = 62.5)
   return time;
 }

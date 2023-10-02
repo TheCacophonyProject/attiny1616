@@ -6,13 +6,12 @@
 #include "Arduino.h"
 #include "ErrorCodes.h"
 
-
-#define LED_ON_DURATION_MS   600000 // Duration of time that the status LED will be on for after the camera status has changed. 10 minutes 10 * 60 * 1000 = 600000
-#define LED_FLASH_DURATION_MS 500   // Duration between LED turning ON and OFF when flashing. 500ms = 0.5s 
-#define ERROR_LED_DURATION_MS 20000 // Duration of time that the error status will be shown for. 20 seconds
-#define LED_FLASH_ON_DURATION_MS 500 // Duration of time that the LED will be on for when flashing.
-#define LED_FLASH_OFF_DURATION_MS 500 // Duration of time that the LED will be off for when flashing.
-#define LED_BETWEEN_FLASHES_MS 2000 // Times between LED flash sequences.
+#define LED_ON_DURATION_MS          300000  // Duration of time that the status LED will be on for after the camera status has changed. 5 minutes 5 * 60 * 1000 = 300000
+#define LED_FLASH_DURATION_MS       500     // Duration between LED turning ON and OFF when flashing. 500ms = 0.5s 
+#define ERROR_LED_DURATION_MS       20000   // Duration of time that the error status will be shown for. 20 seconds
+#define LED_FLASH_ON_DURATION_MS    500     // Duration of time that the LED will be on for when flashing.
+#define LED_FLASH_OFF_DURATION_MS   500     // Duration of time that the LED will be off for when flashing.
+#define LED_BETWEEN_FLASHES_MS      2000    // Times between LED flash sequences.
 
 class StatusLED {
     public:
@@ -30,6 +29,7 @@ class StatusLED {
         unsigned long lastLEDFlashUpdateTime = 0;
         bool ledFlashState = LOW;
         uint8_t ledFlashCount = 0;
+        bool ledOn = true;
         
         unsigned long flashDelay;
         // Flashing is used to flash between two different colors for a number of times

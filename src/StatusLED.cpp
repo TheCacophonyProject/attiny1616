@@ -12,13 +12,15 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
   if (newState != cameraState) {
     ledOnTime = getPitTimeMillis();
     cameraState = newState;
+    ledOn = true;
   }
   if (newConnectionState != connectionState) {
     ledOnTime = getPitTimeMillis();
     connectionState = newConnectionState;
+    ledOn = true;
   }
 
-  if (flashing) {  
+  if (flashing) {
     if (getPitTimeMillis() - lastLEDFlashUpdateTime > flashDelay) {
       lastLEDFlashUpdateTime = getPitTimeMillis();
       flashDelay = LED_FLASH_ON_DURATION_MS;
@@ -42,11 +44,16 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
     }
     return;
   }
-  
+
   if (getPitTimeMillis() - ledOnTime > LED_ON_DURATION_MS) {
-    writeColor(0, 0, 0);
+    ledOn = false;
+  }
+
+  if (!ledOn) {
+    writeColor(LED_OFF);
     return;
   }
+
   switch (cameraState) {
     case CameraState::POWERING_ON:
       writeColor(RED);
@@ -117,6 +124,7 @@ void StatusLED::error(ErrorCode error) {
 
 void StatusLED::show() {
   ledOnTime = getPitTimeMillis();
+  ledOn = true;
 }
 
 void StatusLED::writeColor(uint32_t color) {

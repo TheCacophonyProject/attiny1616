@@ -140,7 +140,7 @@ void setup() {
 
   // Setup interrupts
   attachInterrupt(digitalPinToInterrupt(RTC_ALARM), rtcWakeUp, FALLING);
-  setupPIT(); // Wake up every 1 second.
+  setupPIT();
 
   set_sleep_mode(SLEEP_MODE_IDLE);
   // set_sleep_mode(SLEEP_MODE_PWR_DOWN); // PWM LED signals don't work in this power mode. //TODO Use this power mode when LEDs are solid or not on.
@@ -521,4 +521,5 @@ void processButtonPress() {
       // Waiting for WDT to trigger. This is the easiest way to get a reboot from the ATtiny
     }
   }
+  buttonPressDuration = 0;
 }
