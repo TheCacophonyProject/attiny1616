@@ -102,7 +102,9 @@ void setup() {
   pinMode(MAIN_BAT_SENSE, INPUT);
   pinMode(RTC_ALARM, INPUT_PULLUP);
   pinMode(BUTTON, INPUT_PULLUP);
-  pinMode(PI_SHUTDOWN, INPUT_PULLUP);
+  pinMode(PI_POWERED_OFF, INPUT_PULLUP);
+  pinMode(WAKEUP_PING, OUTPUT);
+  digitalWrite(WAKEUP_PING, HIGH);
   statusLED.writeColor(0, 0, 0);
   
   digitalWrite(EN_RP2040, LOW);
@@ -207,6 +209,7 @@ void checkWDTCountdown() {
 }
 
 void checkPing() {
+  
   if (registers[REG_PING_PI] != 0 &&  getPitTimeMillis() - pingPiTime > PING_PI_TIMEOUT) {
     // Timeout for raspberry pi communicating to attiny.
     writeErrorFlag(ErrorCode::NO_PING_RESPONSE);
@@ -215,9 +218,9 @@ void checkPing() {
 
   // Update Ping Pi pin
   if (registers[REG_PING_PI] == 1) {
-    digitalWrite(PING_PIN, HIGH);
+    digitalWrite(WAKEUP_PING, LOW);
   } else {
-    digitalWrite(PING_PIN, LOW);
+    digitalWrite(WAKEUP_PING, HIGH);
   }
 }
 
@@ -292,18 +295,18 @@ void checkCameraState() {
   if (cameraState == CameraState::POWERING_OFF) {
     // gpio-poweroff in config.txt for the RPi will drive a pin low when it powers off.
     // TODO Check if you need to wait here for a second or two for the flash to finish writing.
-    if (digitalRead(PI_SHUTDOWN) == LOW) {
+    if (digitalRead(PI_POWERED_OFF) == LOW) {
       powerRPiOffNow();
     }
   }
 
-  if (cameraState == CameraState::POWERED_ON && digitalRead(PI_SHUTDOWN) == LOW) {
+  if (cameraState == CameraState::POWERED_ON && digitalRead(PI_POWERED_OFF) == LOW) {
     powerRPiOffNow();
     delay(1000);
     powerOnRPi();
   }
 
-  // TODO replace this with a shutdown timeout, as power off will be triggered from the PI_SHUTDOWN pin.
+  // TODO replace this with a shutdown timeout, as power off will be triggered from the PI_POWERED_OFF pin.
   // Check if the camera has had enough time to power off.
   if (cameraState == CameraState::POWERING_OFF && getPitTimeMillis() - poweringOffTime > POWER_OFF_DELAY_MS) {
     powerRPiOffNow();
@@ -498,7 +501,7 @@ void buttonWakeUp() {
 }
 
 void processButtonPress() {
-  if (buttonPressDuration < 50) {
+  if (buttonPressDuration < 10) {
     return;
   } else if (buttonPressDuration < 2000) {
     statusLED.show();

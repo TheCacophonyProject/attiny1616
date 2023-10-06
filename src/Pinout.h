@@ -10,8 +10,9 @@
 #define MAIN_BAT_SENSE  PIN_PB5   // Connected to the main battery.
 #define RTC_ALARM       PIN_PC1   // Connected to the RTC interrupt pin.
 #define BUTTON          PIN_PA6   // Connected to the button on the case.
-#define PING_PIN        PIN_PB2
-#define PI_SHUTDOWN     PIN_PA7   // Raspberry Pi will drive this pin low when it has finished powering off.
+#define PI_POWERED_OFF  PIN_PA7   // Raspberry Pi will drive this pin low when it has finished powering off.
+#define PI_SHUTDOWN     PIN_PC3   // Trigger Raspberry Pi to shutdown.
 #define EN_RP2040       PIN_PA1   // Drive low to power on rp2040.
+#define WAKEUP_PING     PIN_PC0   // Drive low to get the Raspberry Pi to turn on hotspot/wakeup.
 
 #endif
