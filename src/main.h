@@ -18,20 +18,19 @@ void writeCameraState(CameraState);
 void receiveEvent(int);
 void requestEvent();
 void error(ErrorCode);
-void wdtCountdown();
-void checkWDTCountdown();
 void powerOnPRi();
 void processButtonPress();
 void buttonWakeUp();
 void powerOnRPi();
 void powerOffRPi();
 void rtcWakeUp();
-void checkPing();
 void powerRPiOffNow();
-void wdtRegUpdate();
-void checkWakeUpReg();
+void checkWakeUpPiReg();
 void poweringOffRPi();
 void updateLEDs();
 void writeErrorFlag(ErrorCode, bool);
+void requestPiCommand(uint8_t);
+void checkPiCommands();
+void checkPiCommsCountdown();
 
 #endif // MAIN_H

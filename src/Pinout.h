@@ -13,6 +13,6 @@
 #define PI_POWERED_OFF  PIN_PA7   // Raspberry Pi will drive this pin low when it has finished powering off.
 #define PI_SHUTDOWN     PIN_PC3   // Trigger Raspberry Pi to shutdown.
 #define EN_RP2040       PIN_PA1   // Drive low to power on rp2040.
-#define WAKEUP_PING     PIN_PC0   // Drive low to get the Raspberry Pi to turn on hotspot/wakeup.
+#define PI_COMMAND_PIN  PIN_PC0   // Drive low to get the Raspberry Pi to check what commands to run.
 
 #endif

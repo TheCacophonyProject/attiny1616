@@ -10,7 +10,7 @@ enum class ErrorCode {
   LOW_BATTERY_LEVEL_SET_TOO_LOW = 0x06,  // Low battery level was attempted to be set too low.
   INVALID_REG_ADDRESS           = 0x07,  // Attempted to write to an invalid register address.
   INVALID_ERROR_CODE            = 0x08,  // Invalid error code.
-  NO_PING_RESPONSE              = 0x09,  // No ping response.
+  PI_COMMAND_TIMEDOUT           = 0x09,  // No ping response.
   RTC_TIMEOUT                   = 0x0A   // RTC timeout.
 };
 
