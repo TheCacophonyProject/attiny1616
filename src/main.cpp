@@ -7,7 +7,7 @@
 #include <timer.h>
 #include <avr/io.h>
 
-#define VERSION 2
+#define VERSION 3
 
 //=====DEFINITIONS=====//
 #define BATTERY_HYSTERESIS 10
@@ -79,7 +79,7 @@ volatile unsigned long poweredOffTime = 0;
 #define MAX_POWERED_OFF_DURATION_MS 86400000
 
 // Time from getPitTimeMillis() of when the ATtiny requested communications from the Raspberry Pi.
-// If the Raspberry Pi is not hear from after PING_PI_TIMEOUT a error flag will be set in the I2C register.
+// If the Raspberry Pi is not hear from after PI_COMMAND_TIMEOUT a error flag will be set in the I2C register.
 //volatile unsigned long pingPiTime = 0;
 volatile unsigned long piCommandRequestTime = 0;
 #define PI_COMMAND_TIMEOUT 5000
@@ -202,7 +202,6 @@ void checkPiCommsCountdown() {
     return;
   }
   if (getPitTimeMillis() - lastPiCommsTime > PI_COMMS_INTERVAL) {
-    quickFlash = true;
     requestPiCommand(WRITE_CAMERA_STATE_FLAG);
   }
 }
