@@ -7,7 +7,7 @@
 #include <timer.h>
 #include <avr/io.h>
 
-#define VERSION 3
+#define VERSION 4
 
 //=====DEFINITIONS=====//
 #define BATTERY_HYSTERESIS 10
