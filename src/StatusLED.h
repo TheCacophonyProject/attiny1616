@@ -13,6 +13,10 @@
 #define LED_FLASH_OFF_DURATION_MS   500     // Duration of time that the LED will be off for when flashing.
 #define LED_BETWEEN_FLASHES_MS      2000    // Times between LED flash sequences.
 
+//TODO LED states to show
+// ENABLING WIFI (blinking green)
+// ENABLING HOTSPOT (blinking yellow)
+
 class StatusLED {
     public:
         void error(ErrorCode);
@@ -22,6 +26,7 @@ class StatusLED {
         void writeColor(uint8_t r, uint8_t g, uint8_t b);
         void showError(ErrorCode);
         void flash(uint8_t, unsigned long, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t);
+        bool isOn();
     private:
         CameraState cameraState;
         CameraConnectionState connectionState;

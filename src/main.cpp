@@ -95,8 +95,10 @@ void setup() {
   pinMode(LED_R, OUTPUT);
   pinMode(LED_G, OUTPUT);
   pinMode(LED_B, OUTPUT);
-  pinMode(EN_5V, OUTPUT);
   digitalWrite(EN_5V, HIGH);
+  pinMode(EN_5V, OUTPUT);
+  digitalWrite(PI_SHUTDOWN, HIGH);
+  pinMode(PI_SHUTDOWN, OUTPUT);
   pinMode(EN_RP2040, OUTPUT);
   pinMode(RTC_BAT_SENSE, INPUT);
   pinMode(MAIN_BAT_SENSE, INPUT);
@@ -106,8 +108,6 @@ void setup() {
   pinMode(PI_COMMAND_PIN, OUTPUT);
   digitalWrite(PI_COMMAND_PIN, HIGH);
   statusLED.writeColor(0, 0, 0);
-  
-  digitalWrite(EN_RP2040, LOW);
 
   // Check for a low battery.
   checkMainBattery();
@@ -448,6 +448,7 @@ void rtcWakeUp() {
 void powerOnRPi() {
   checkMainBattery(); // Will stay in checkMainBattery until battery is good.
   digitalWrite(EN_5V, HIGH);
+  digitalWrite(EN_RP2040, LOW);
   writeCameraState(CameraState::POWERING_ON);
   poweringOnTime = getPitTimeMillis();
 }
@@ -460,6 +461,14 @@ void poweringOffRPi() {
 void powerRPiOffNow() {
   writeCameraState(CameraState::POWERED_OFF);
   digitalWrite(EN_5V, LOW);
+}
+
+void powerOffRPi() {
+  digitalWrite(PI_SHUTDOWN, LOW);
+  digitalWrite(EN_RP2040, HIGH);
+  poweringOffRPi();
+  delay(100);
+  digitalWrite(PI_SHUTDOWN, HIGH);
 }
 
 void requestPiCommand(uint8_t command) {
@@ -494,16 +503,25 @@ void buttonWakeUp() {
 
 void processButtonPress() {
   if (buttonPressDuration < 10) {
+    buttonPressDuration = 0;
     return;
   } else if (buttonPressDuration < 2000) {
-    statusLED.show();
-    if (cameraState == CameraState::POWERED_OFF) {
-      powerOnRPi();
-    } else {
+    if (!statusLED.isOn()) {
+      statusLED.show();
+    } else if (cameraState == CameraState::POWERED_ON) {
       requestPiCommand(ENABLE_WIFI_FLAG);
     }
     updateLEDs();
   } else {
+    if (cameraState == CameraState::POWERED_OFF) {
+      powerOnRPi();
+    } else {
+      powerOffRPi();
+      //requestPiCommand(ENABLE_WIFI_FLAG);
+    }
+    
+    /*    
+    return;
     statusLED.writeColor(0x000000);
     digitalWrite(EN_5V, LOW);
     delay(5000);
@@ -515,6 +533,7 @@ void processButtonPress() {
     while(1) {
       // Waiting for WDT to trigger. This is the easiest way to get a reboot from the ATtiny
     }
+    */
   }
   buttonPressDuration = 0;
 }

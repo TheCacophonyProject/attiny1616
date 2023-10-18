@@ -122,6 +122,10 @@ void StatusLED::error(ErrorCode error) {
   flash(static_cast<int>(error), ERROR_LED_DURATION_MS, 255, 0, 0, 0, 0, 0);
 }
 
+bool StatusLED::isOn() {
+  return ledOn;
+}
+
 void StatusLED::show() {
   ledOnTime = getPitTimeMillis();
   ledOn = true;
