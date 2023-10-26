@@ -11,6 +11,7 @@
 
 //=====DEFINITIONS=====//
 #define BATTERY_HYSTERESIS 10
+#define BUTTON_LONG_PRESS_DURATION 2000
 
 //=====I2C DEFINITIONS=====//
 #define I2C_ADDRESS 0x25
@@ -178,6 +179,7 @@ void loop() {
   checkPiCommsCountdown();
 
   updateLEDs();
+  //delay(50);
   sleep_cpu();
 }
 
@@ -247,14 +249,14 @@ void checkMainBattery() {
   // Loop checking battery voltage until battery is better
   while (1) {
     // Check main battery, making sure it reaches the threshold at least 10 times in a row.
-    bool lowbattery = false;
+    bool lowBattery = false;
     for (int i = 0; i < 10; i++) {
       if (analogRead(MAIN_BAT_SENSE) < lowBatteryValue + BATTERY_HYSTERESIS) {
-        lowbattery = true;
+        lowBattery = true;
         break;
       }
     }
-    if (!lowbattery) {
+    if (!lowBattery) {
       return; // Battery is better again, return to normal loop.
     }
 
@@ -294,6 +296,7 @@ void checkCameraState() {
     // TODO Check if you need to wait here for a second or two for the flash to finish writing.
     if (digitalRead(PI_POWERED_OFF) == LOW) {
       powerRPiOffNow();
+      statusLED.off();
     }
   }
 
@@ -493,19 +496,22 @@ void buttonWakeUp() {
   }}
   unsigned long start = getPitTimeMillis();
   while (digitalRead(BUTTON) == LOW) {
-    statusLED.writeColor(0xFFFFFF);
+    if (getPitTimeMillis() - start > BUTTON_LONG_PRESS_DURATION) {
+      statusLED.writeColor(0x000000);
+    } else {
+      statusLED.writeColor(0xFFFFFF);
+    }
     delay(1);
   }
   updateLEDs();
   buttonPressDuration = getPitTimeMillis() - start;
-  //registers[0x19] = buttonPressDuration/100;
 }
 
 void processButtonPress() {
   if (buttonPressDuration < 10) {
     buttonPressDuration = 0;
     return;
-  } else if (buttonPressDuration < 2000) {
+  } else if (buttonPressDuration < BUTTON_LONG_PRESS_DURATION) {
     if (!statusLED.isOn()) {
       statusLED.show();
     } else if (cameraState == CameraState::POWERED_ON) {
@@ -519,21 +525,6 @@ void processButtonPress() {
       powerOffRPi();
       //requestPiCommand(ENABLE_WIFI_FLAG);
     }
-    
-    /*    
-    return;
-    statusLED.writeColor(0x000000);
-    digitalWrite(EN_5V, LOW);
-    delay(5000);
-
-    // Set timeout to 8ms, section 19.6.1 of datasheet.
-    CCP = CCP_IOREG_gc;
-    WDT.CTRLA = 1;
-
-    while(1) {
-      // Waiting for WDT to trigger. This is the easiest way to get a reboot from the ATtiny
-    }
-    */
   }
   buttonPressDuration = 0;
 }

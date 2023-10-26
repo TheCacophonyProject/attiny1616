@@ -56,13 +56,13 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
 
   switch (cameraState) {
     case CameraState::POWERING_ON:
-      writeColor(RED);
+      writeColor(sawTooth(220, 1, ledOnTime, 2000), 0, 0);
       break;
     case CameraState::POWERING_OFF:
-      writeColor(YELLOW);
+      writeColor(255-sawTooth(254, 35, ledOnTime, 2000), 0, 0);
       break;
     case CameraState::POWERED_OFF:
-      writeColor(LED_OFF);
+      writeColor(RED);
       break;
     case CameraState::POWER_ON_TIMEOUT:
       if (getPitTimeMillis() - lastLEDFlashUpdateTime > LED_FLASH_DURATION_MS) {
@@ -98,6 +98,18 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
   }
 }
 
+uint8_t sawTooth(uint8_t max, uint8_t min, long startTime, unsigned long period) {
+    if (period == 0) {
+        return 0;
+    }
+    unsigned long i = (getPitTimeMillis() - startTime) % period;
+    // Calculate i^3 / period^3 using double to avoid overflow and precision loss.
+    // This is to make the led brightness look more linear to the human eye.
+    double ratio = ((double)i * i * i) / ((double)period * period * period);
+    return (uint8_t)(min+((max-min) * ratio));
+}
+
+
 void StatusLED::flash(uint8_t flashLen, unsigned long duration, uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2) {
   if (flashing) {
     return; // Don't update flash if already flashing.
@@ -129,6 +141,10 @@ bool StatusLED::isOn() {
 void StatusLED::show() {
   ledOnTime = getPitTimeMillis();
   ledOn = true;
+}
+
+void StatusLED::off() {
+  ledOn = false;
 }
 
 void StatusLED::writeColor(uint32_t color) {

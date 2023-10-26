@@ -27,6 +27,7 @@ class StatusLED {
         void showError(ErrorCode);
         void flash(uint8_t, unsigned long, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t);
         bool isOn();
+        void off();
     private:
         CameraState cameraState;
         CameraConnectionState connectionState;
@@ -51,5 +52,7 @@ class StatusLED {
         unsigned long flashStartTime;
         unsigned long flashDuration;
 };
+
+uint8_t sawTooth(uint8_t, uint8_t, long, unsigned long);
 
 #endif
