@@ -32,5 +32,7 @@ void writeErrorFlag(ErrorCode, bool);
 void requestPiCommand(uint8_t);
 void checkPiCommands();
 void checkPiCommsCountdown();
+void powerOnRP2040();
+void powerOffRP2040();
 
 #endif // MAIN_H

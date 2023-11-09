@@ -7,7 +7,7 @@
 #include <timer.h>
 #include <avr/io.h>
 
-#define VERSION 5
+#define VERSION 6
 
 //=====DEFINITIONS=====//
 #define BATTERY_HYSTERESIS 10
@@ -25,6 +25,7 @@
 #define REG_PI_COMMANDS         0x04
 #define REG_TRIGGER_SLEEP       0x05
 #define REG_PI_WAKEUP           0x06
+#define REG_TC2_AGENT_READY     0x07  
 
 #define REG_BATTERY1            0x10
 #define REG_BATTERY2            0x11
@@ -42,6 +43,7 @@
 #define WRITE_CAMERA_STATE_FLAG 0x01
 #define READ_ERRORS_FLAG        0x01 << 1
 #define ENABLE_WIFI_FLAG        0x01 << 2
+#define POWER_OFF_RPI           0x01 << 3
 
 
 uint8_t registers[REG_LEN] = {0};
@@ -353,10 +355,19 @@ void rtcBatteryRegUpdate() {
   }
 }
 
+// checkRegSleep
+// 0: Not sleeping.
+// 1 << 0: Request RPi to power down.
+// 1 << 1: Power off RP2040.
 void checkRegSleep() {
-  if (registers[REG_TRIGGER_SLEEP] != 0) {
-    registers[REG_TRIGGER_SLEEP] = 0;
-    poweringOffRPi();
+  if (registers[REG_TRIGGER_SLEEP] & (0x01 << 0)) {
+    requestPiCommand(POWER_OFF_RPI);
+    poweringOffRPi(); // TODO make the pi signal to the ATtiny when it is going to sleep instead.
+    registers[REG_TRIGGER_SLEEP] = registers[REG_TRIGGER_SLEEP] & ~(0x01 << 0);
+  }
+  if (registers[REG_TRIGGER_SLEEP] & (0x01 << 1)) {
+    powerOffRP2040();
+    registers[REG_TRIGGER_SLEEP] = registers[REG_TRIGGER_SLEEP] & ~(0x01 << 1);
   }
 }
 
@@ -442,22 +453,32 @@ void requestEvent() {
 void rtcWakeUp() {
   if (cameraState == CameraState::POWERED_OFF) {
     checkMainBattery();
-    powerOnRPi();
+    powerOnRP2040();
   }
-  // TODO Wake up RP2040 
+}
+
+//======================= RP2040 FUNCTIONS ============================//
+void powerOnRP2040() {
+  checkMainBattery(); // Will stay in checkMainBattery until battery is good.
+  digitalWrite(EN_RP2040, LOW);
+}
+
+void powerOffRP2040() {
+  digitalWrite(EN_RP2040, HIGH);
 }
 
 //======================= RASPBERRY_PI FUNCTIONS ============================//
 void powerOnRPi() {
   checkMainBattery(); // Will stay in checkMainBattery until battery is good.
   digitalWrite(EN_5V, HIGH);
-  digitalWrite(EN_RP2040, LOW);
+  powerOnRP2040();
   writeCameraState(CameraState::POWERING_ON);
   poweringOnTime = getPitTimeMillis();
 }
 
 void poweringOffRPi() {
   writeCameraState(CameraState::POWERING_OFF);
+  // TODO tc2-agent register set to 0 
   poweringOffTime = getPitTimeMillis();
 }
 
@@ -468,7 +489,6 @@ void powerRPiOffNow() {
 
 void powerOffRPi() {
   digitalWrite(PI_SHUTDOWN, LOW);
-  digitalWrite(EN_RP2040, HIGH);
   poweringOffRPi();
   delay(100);
   digitalWrite(PI_SHUTDOWN, HIGH);

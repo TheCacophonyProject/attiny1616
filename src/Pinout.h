@@ -3,8 +3,8 @@
 
 //=====PIN DEFINITIONS=====//
 #define LED_R           PIN_PA5 
-#define LED_G           PIN_PA4
-#define LED_B           PIN_PA3
+#define LED_G           PIN_PB2
+#define LED_B           PIN_PB3
 #define EN_5V           PIN_PA2   // Enable the 5V voltage rail.
 #define RTC_BAT_SENSE   PIN_PB4   // Connected to the RTC battery. Connected through a diode so will expect a voltage drop from that.
 #define MAIN_BAT_SENSE  PIN_PB5   // Connected to the main battery.
