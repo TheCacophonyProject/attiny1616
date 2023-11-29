@@ -6,7 +6,8 @@ enum class CameraState {
   POWERED_ON           = 0x01,  // Heard from camera.
   POWERING_OFF         = 0x02,  // Waiting to power off the Raspberry Pi.
   POWERED_OFF          = 0x03,  // Camera is powered off.
-  POWER_ON_TIMEOUT     = 0x04   // Didn't hear from the camera after x amount of time after it being powered on.
+  POWER_ON_TIMEOUT     = 0x04,  // Didn't hear from the camera after x amount of time after it being powered on.
+  REBOOTING            = 0x05,  // Raspberry Pi is rebooting.
 };
 
 enum class CameraConnectionState {

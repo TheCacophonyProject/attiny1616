@@ -7,7 +7,7 @@
 #include <timer.h>
 #include <avr/io.h>
 
-#define VERSION 6
+#define VERSION 8
 
 //=====DEFINITIONS=====//
 #define BATTERY_HYSTERESIS 10
@@ -18,27 +18,29 @@
 #define REG_LEN     0x24
 
 // Check registers.md for details on registers functions. //TODO, update registers.md
-#define REG_TYPE                0x00
-#define REG_VERSION             0x01
-#define REG_CAMERA_STATE        0x02
-#define REG_CAMERA_CONNECTION   0x03
-#define REG_PI_COMMANDS         0x04
-#define REG_TRIGGER_SLEEP       0x05
-#define REG_PI_WAKEUP           0x06
-#define REG_TC2_AGENT_READY     0x07  
+#define REG_TYPE                 0x00
+#define REG_VERSION              0x01
+#define REG_CAMERA_STATE         0x02
+#define REG_CAMERA_CONNECTION    0x03
+#define REG_PI_COMMANDS          0x04
+#define REG_RP2040_PI_POWER_CTRL 0x05
 
-#define REG_BATTERY1            0x10
-#define REG_BATTERY2            0x11
-#define REG_BATTERY3            0x12
-#define REG_BATTERY4            0x13
-#define REG_BATTERY5            0x14
-#define REG_RTC_BATTERY1        0x15
-#define REG_RTC_BATTERY2        0x16
+#define REG_TC2_AGENT_READY      0x07
 
-#define REG_ERRORS1             0x20
-#define REG_ERRORS2             0x21
-#define REG_ERRORS3             0x22
-#define REG_ERRORS4             0x23
+#define REG_BATTERY_CHECK_CTRL 0x10 //CTRL
+#define REG_BATTERY_LOW_VAL1   0x11 //LOW 1
+#define REG_BATTERY_LOW_VAL2   0x12 //LOW 2
+#define REG_BATTERY_LV_DIV_VAL1    0x13 //HV1
+#define REG_BATTERY_LV_DIV_VAL2    0x14 //HV2
+#define REG_BATTERY_HV_DIV_VAL1    0x15 //LV1
+#define REG_BATTERY_HV_DIV_VAL2    0x16 //LV2
+#define REG_BATTERY_RTC_VAL1   0x17 //LV1
+#define REG_BATTERY_RTC_VAL2   0x18 //LV2
+
+#define REG_ERRORS1 0x20
+#define REG_ERRORS2 0x21
+#define REG_ERRORS3 0x22
+#define REG_ERRORS4 0x23
 
 #define WRITE_CAMERA_STATE_FLAG 0x01
 #define READ_ERRORS_FLAG        0x01 << 1
@@ -51,11 +53,13 @@ uint8_t writeMasks[REG_LEN] = {}; // Should all be initialised to 0xFF
 uint8_t registerAddress = 0;
 
 //=====GLOBAL VARIABLES=====//
-volatile uint16_t mainBatteryVoltage = 0; // Raw reading value from ADC
-volatile uint16_t rtcBatteryVoltage = 0;  // Raw reading value from ADC
-volatile bool lowBatteryCheck = false;    // Check main battery for a low battery condition.
-volatile uint16_t lowBatteryValue = 0;    // Value that triggers a low battery condition.
-volatile bool registersWrittenTo = false; // Flag to indicate that registers have been written to.
+volatile uint16_t battLowVoltageDiv = 0;      // Raw reading value from ADC
+volatile uint16_t battHighVoltageDiv = 0;     // Raw reading value from ADC
+volatile uint16_t battRTC = 0;      // Raw reading value from ADC
+volatile bool lowBatteryCheck = false;        // Check main battery for a low battery condition.
+volatile uint16_t lowBatteryValue = 0;        // Value that triggers a low battery condition.
+volatile bool registersWrittenTo = false;     // Flag to indicate that registers have been written to.
+volatile bool rp2040ReadyToPowerOff = false;  // Need to wait for RPi to power off so this flag is set by the RP2040 when it is ready.
 
 //======== TIMERS ==========//
 // Time from getPitTimeMillis() of then the camera was powered on.
@@ -104,7 +108,8 @@ void setup() {
   pinMode(PI_SHUTDOWN, OUTPUT);
   pinMode(EN_RP2040, OUTPUT);
   pinMode(RTC_BAT_SENSE, INPUT);
-  pinMode(MAIN_BAT_SENSE, INPUT);
+  pinMode(HV_BAT_SENSE, INPUT);
+  pinMode(LV_BAT_SENSE, INPUT);
   pinMode(RTC_ALARM, INPUT_PULLUP);
   pinMode(BUTTON, INPUT_PULLUP);
   pinMode(PI_POWERED_OFF, INPUT_PULLUP);
@@ -113,7 +118,7 @@ void setup() {
   statusLED.writeColor(0, 0, 0);
 
   // Check for a low battery.
-  checkMainBattery();
+  checkForLowBattery();
 
   statusLED.writeColor(255, 0, 0);
   delay(100);
@@ -121,6 +126,7 @@ void setup() {
   delay(100);
   statusLED.writeColor(0, 0, 255);
   delay(100);
+  statusLED.writeColor(0, 0, 0);
 
   // Write I2C register write masks.
   for (int i = 0; i < REG_LEN; i++) {
@@ -128,15 +134,19 @@ void setup() {
   }
   writeMasks[REG_VERSION] = 0x00; 
   writeMasks[REG_TYPE] = 0x00;
-  writeMasks[REG_BATTERY3] = 0x03; // Only allow writing to bits to turn on or off battery check.
-  writeMasks[REG_BATTERY1] = 0x01 << 7;
-  writeMasks[REG_BATTERY2] = 0x00;
-  writeMasks[REG_RTC_BATTERY1] = 0x01 << 7;
-  writeMasks[REG_RTC_BATTERY2] = 0x00;
+  writeMasks[REG_BATTERY_CHECK_CTRL] = 0x03; // Only allow writing to bits to turn on or off battery check.
+  writeMasks[REG_BATTERY_LV_DIV_VAL1] = 0x01 << 7;
+  writeMasks[REG_BATTERY_LV_DIV_VAL2] = 0x00;
+  writeMasks[REG_BATTERY_HV_DIV_VAL1] = 0x01 << 7;
+  writeMasks[REG_BATTERY_HV_DIV_VAL2] = 0x00;
+  writeMasks[REG_BATTERY_RTC_VAL1] = 0x01 << 7;
+  writeMasks[REG_BATTERY_RTC_VAL2] = 0x00;
   
   // Write I2C initial register values.
   registers[REG_TYPE] = 0xCA;
   registers[REG_VERSION] = VERSION;
+  
+  registers[REG_TC2_AGENT_READY] = 2; // TODO Have this initialized to 0 and be updated by tc2-agent.
 
   // Setup I2C
   Wire.begin(I2C_ADDRESS);
@@ -165,20 +175,33 @@ void loop() {
   // Check updates from I2C registers
   //if (registersWrittenTo) {
   //  registersWrittenTo = false;
-  lowBatteryRegUpdate();
-  mainBatteryRegUpdate();
-  rtcBatteryRegUpdate();
+  regBatteryLVDivUpdate();
+  regBatteryHVDivUpdate();
+  regBatteryRTCUpdate();
   checkRegSleep();
-  checkWakeUpPiReg();
+  //checkWakeUpPiReg();
   //}
 
   buttonWakeUp();
 
   processButtonPress();
-  checkMainBattery();
+  checkForLowBattery();
   checkCameraState();
   checkPiCommands();
   checkPiCommsCountdown();
+
+  // Only power off the RP2040 when the RPi has been power off first.
+  if (rp2040ReadyToPowerOff && registers[REG_CAMERA_STATE] == uint8_t(CameraState::POWERED_OFF)) {
+    powerOffRP2040();
+    rp2040ReadyToPowerOff = false;
+    //TODO Check that this won't power off the RP2040 when unwanted, might need more logic around the rp2040ReadyToPowerOff variable.
+  }
+
+  if (statusLED.isOn()) {
+    set_sleep_mode(SLEEP_MODE_IDLE);
+  } else {
+    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  }
 
   updateLEDs();
   //delay(50);
@@ -192,8 +215,9 @@ void updateLEDs() {
 void writeErrorFlag(ErrorCode errorCode, bool flash = true) {
   uint8_t errorCodeUint = static_cast<uint8_t>(errorCode);
   uint8_t regOffset = errorCodeUint/8;
+  uint8_t regBit = errorCodeUint%8;
   uint8_t reg = REG_ERRORS1 + regOffset;
-  registers[reg] |= (1 << (errorCodeUint%8));
+  registers[reg] |= 1 << regBit;
   // TODO save error registers to EEPROM so can be restored on reboot 
   if (flash) {
     statusLED.error(errorCode);
@@ -225,7 +249,44 @@ void checkPiCommands() {
   }
 }
 
-void checkMainBattery() {
+
+// ================ BATTERY CHECKS ==================
+
+uint16_t sampleBattery(int batteryVoltagePin) {
+  int samples = 10;
+  int batteryVoltageSum = 0;
+  for (int i = 0; i < samples; i++) {
+    batteryVoltageSum += analogRead(batteryVoltagePin);
+  }
+  return batteryVoltageSum / samples;
+}
+
+void checkBatteryHighVoltageDivider() {
+  battHighVoltageDiv = sampleBattery(HV_BAT_SENSE);
+}
+
+void checkBatteryLowVoltageDivider() {
+  checkBatteryHighVoltageDivider();
+  if (battHighVoltageDiv > 340) { // TODO Find proper value for this.
+    // If battery voltage is too high the low voltage divider won't work and 
+    // should be set to an LOW output to prevent high voltages on the pin.
+    digitalWrite(LV_BAT_SENSE, LOW);
+    pinMode(LV_BAT_SENSE, OUTPUT);
+    battLowVoltageDiv = 1023;
+    return;
+  }
+  pinMode(LV_BAT_SENSE, INPUT);
+  delay(1);
+  battLowVoltageDiv = sampleBattery(LV_BAT_SENSE);
+}
+
+void checkBatteryRTC() {
+  battRTC = sampleBattery(RTC_BAT_SENSE);
+}
+
+void checkForLowBattery() {
+  //TODO
+  /*
   int samples = 10;
   int batteryVoltage = 0;
   for (int i = 0; i < samples; i++) {
@@ -265,21 +326,12 @@ void checkMainBattery() {
     // TODO go to deep sleep.
     // Wait for PIT to wake up again and then check battery. 
   }
-}
-
-
-void checkRTCBattery() {
-  int samples = 10;
-  int batteryVoltage = 0;
-  for (int i = 0; i < samples; i++) {
-    batteryVoltage += analogRead(RTC_BAT_SENSE);
-  }
-  rtcBatteryVoltage = batteryVoltage / samples;
+  */
 }
 
 void checkCameraState() {
   // Update camera state from register if valid.
-  if (registers[REG_CAMERA_STATE] <= static_cast<uint8_t>(CameraState::POWER_ON_TIMEOUT)) {
+  if (registers[REG_CAMERA_STATE] <= static_cast<uint8_t>(CameraState::REBOOTING)) {
     writeCameraState(static_cast<CameraState>(registers[REG_CAMERA_STATE]));
   } else {
     writeErrorFlag(ErrorCode::INVALID_CAMERA_STATE);
@@ -302,11 +354,13 @@ void checkCameraState() {
     }
   }
 
-  if (cameraState == CameraState::POWERED_ON && digitalRead(PI_POWERED_OFF) == LOW) {
+  if ((cameraState == CameraState::POWERED_ON || cameraState == CameraState::REBOOTING) && digitalRead(PI_POWERED_OFF) == LOW) {
     powerRPiOffNow();
     delay(1000);
     powerOnRPi();
   }
+
+  //TODO Check if PI_POWERED_OFF pin is low and not in the proper state for it.
 
   // TODO replace this with a shutdown timeout, as power off will be triggered from the PI_POWERED_OFF pin.
   // Check if the camera has had enough time to power off.
@@ -332,42 +386,46 @@ void writeCameraState(CameraState newCameraState) {
 }
 //============================== I2C Register FUNCTIONS ==============================//
 
-void checkWakeUpPiReg() {
-  if (registers[REG_PI_WAKEUP] != 0) {
-    registers[REG_PI_WAKEUP] = 0;
-    powerOnRPi();
+void regBatteryLVDivUpdate() {
+  if (registers[REG_BATTERY_LV_DIV_VAL1] & 0x01 << 0x07) {
+    checkBatteryLowVoltageDivider();
+    registers[REG_BATTERY_LV_DIV_VAL1] = battLowVoltageDiv >> 8 & ~(0x01 << 0x07); // Writing the MSB of the battery voltage and clear bit 7.
+    registers[REG_BATTERY_LV_DIV_VAL2] = battLowVoltageDiv & 0xFF;
   }
 }
 
-void mainBatteryRegUpdate() {
-  if (registers[REG_BATTERY1] & 0x01 << 0x07) {
-    checkMainBattery();
-    registers[REG_BATTERY2] = mainBatteryVoltage & 0xFF;
-    registers[REG_BATTERY1] = mainBatteryVoltage >> 8 & ~(0x01 << 0x07); // Writing the MSB of the battery voltage and clear bit 7.
+void regBatteryHVDivUpdate() {
+  if (registers[REG_BATTERY_HV_DIV_VAL1] & 0x01 << 0x07) {
+    checkBatteryHighVoltageDivider();
+    registers[REG_BATTERY_HV_DIV_VAL1] = battHighVoltageDiv >> 8 & ~(0x01 << 0x07); // Writing the MSB of the battery voltage and clear bit 7.
+    registers[REG_BATTERY_HV_DIV_VAL2] = battHighVoltageDiv & 0xFF;
   }
 }
 
-void rtcBatteryRegUpdate() {
-  if (registers[REG_RTC_BATTERY1] & 0x01 << 0x07) {
-    checkRTCBattery();
-    registers[REG_RTC_BATTERY2] = rtcBatteryVoltage & 0xFF;
-    registers[REG_RTC_BATTERY1] = rtcBatteryVoltage >> 8 & ~(0x01 << 0x07); // Writing the MSB of the battery voltage and clear bit 7.
+void regBatteryRTCUpdate() {
+  if (registers[REG_BATTERY_RTC_VAL1] & 0x01 << 0x07) {
+    checkBatteryRTC();
+    registers[REG_BATTERY_RTC_VAL1] = battRTC >> 8 & ~(0x01 << 0x07); // Writing the MSB of the battery voltage and clear bit 7.
+    registers[REG_BATTERY_RTC_VAL2] = battRTC & 0xFF;
   }
 }
 
+//TODO
 // checkRegSleep
 // 0: Not sleeping.
-// 1 << 0: Request RPi to power down.
-// 1 << 1: Power off RP2040.
+// 1 << 0: Request RPi to power down.   // Pi Needed by RO2040
+// 1 << 1: Power off RP2040.            // RP2040 not needed to be powered on any more.
+// 
+// 0: Keep Pi on adn RP2040 on.
 void checkRegSleep() {
-  if (registers[REG_TRIGGER_SLEEP] & (0x01 << 0)) {
+  if (registers[REG_RP2040_PI_POWER_CTRL] & (0x01 << 0)) {
     requestPiCommand(POWER_OFF_RPI);
     poweringOffRPi(); // TODO make the pi signal to the ATtiny when it is going to sleep instead.
-    registers[REG_TRIGGER_SLEEP] = registers[REG_TRIGGER_SLEEP] & ~(0x01 << 0);
+    registers[REG_RP2040_PI_POWER_CTRL] = registers[REG_RP2040_PI_POWER_CTRL] & ~(0x01 << 0);
   }
-  if (registers[REG_TRIGGER_SLEEP] & (0x01 << 1)) {
-    powerOffRP2040();
-    registers[REG_TRIGGER_SLEEP] = registers[REG_TRIGGER_SLEEP] & ~(0x01 << 1);
+  if (registers[REG_RP2040_PI_POWER_CTRL] & (0x01 << 1)) {
+    rp2040ReadyToPowerOff = true;   // TODO Need a way of setting this to false again if the RP2040 should no longer be powered off. 
+    registers[REG_RP2040_PI_POWER_CTRL] = registers[REG_RP2040_PI_POWER_CTRL] & ~(0x01 << 1);
   }
 }
 
@@ -377,10 +435,12 @@ void checkRegSleep() {
 // bit 1: write high to disable low battery.
 // bit 0: write high to enable low battery.
 void lowBatteryRegUpdate() {
+  //TODO
+  /*
   // Check if low battery check is wanting to be enabled.
   if (registers[REG_BATTERY3] & 0x01) {
-    uint16_t newLowBatteryVal = (registers[REG_BATTERY1] << 8) | registers[REG_BATTERY2];
-    checkMainBattery();
+    uint16_t newLowBatteryVal = (registers[REG_BATTERY4] << 8) | registers[REG_BATTERY5];
+    checkForLowBattery();
     // Check that the new value is not less than the current battery value with a bit of a buffer.
     // This is to prevent the case when it might be set too high and the device will never turn on fully as it always has a "low" battery.
     // 31 should be about 0.1V
@@ -396,6 +456,7 @@ void lowBatteryRegUpdate() {
   if (registers[REG_BATTERY3] & 0x01 << 1) {
     registers[REG_BATTERY3] = 0x00;
   }
+  */
 }
 
 
@@ -420,8 +481,8 @@ void receiveEvent(int howMany) {
     // Write data to register.
     if (Wire.available()) {
       // Disable the low battery check if changing the low battery value.
-      if (registerAddress == REG_BATTERY5 || registerAddress == REG_BATTERY4) {
-        registers[REG_BATTERY3] = 0;
+      if (registerAddress == REG_BATTERY_LOW_VAL2 || registerAddress == REG_BATTERY_LOW_VAL1) {
+        registers[REG_BATTERY_CHECK_CTRL] = 0;
       }
 
       uint8_t data = Wire.read();
@@ -452,14 +513,15 @@ void requestEvent() {
 // Function attached to the pin connected to the alarm pin on the RTC.
 void rtcWakeUp() {
   if (cameraState == CameraState::POWERED_OFF) {
-    checkMainBattery();
+    checkForLowBattery();
     powerOnRP2040();
   }
 }
 
 //======================= RP2040 FUNCTIONS ============================//
 void powerOnRP2040() {
-  checkMainBattery(); // Will stay in checkMainBattery until battery is good.
+  rp2040ReadyToPowerOff = false;
+  checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
   digitalWrite(EN_RP2040, LOW);
 }
 
@@ -469,7 +531,7 @@ void powerOffRP2040() {
 
 //======================= RASPBERRY_PI FUNCTIONS ============================//
 void powerOnRPi() {
-  checkMainBattery(); // Will stay in checkMainBattery until battery is good.
+  checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
   digitalWrite(EN_5V, HIGH);
   powerOnRP2040();
   writeCameraState(CameraState::POWERING_ON);
@@ -543,7 +605,6 @@ void processButtonPress() {
       powerOnRPi();
     } else {
       powerOffRPi();
-      //requestPiCommand(ENABLE_WIFI_FLAG);
     }
   }
   buttonPressDuration = 0;

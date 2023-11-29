@@ -34,5 +34,9 @@ void checkPiCommands();
 void checkPiCommsCountdown();
 void powerOnRP2040();
 void powerOffRP2040();
+void regBatteryRTCUpdate();
+void regBatteryHVDivUpdate();
+void regBatteryLVDivUpdate();
+void checkForLowBattery();
 
 #endif // MAIN_H

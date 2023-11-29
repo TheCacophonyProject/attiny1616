@@ -56,7 +56,7 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
 
   switch (cameraState) {
     case CameraState::POWERING_ON:
-      writeColor(sawTooth(220, 1, ledOnTime, 2000), 0, 0);
+      writeColor(0, sawTooth(220, 1, ledOnTime, 2000), 0);
       break;
     case CameraState::POWERING_OFF:
       writeColor(255-sawTooth(254, 35, ledOnTime, 2000), 0, 0);
@@ -90,6 +90,13 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
         default:
           error(ErrorCode::INVALID_CAMERA_STATE);
           break;
+      }
+      break;
+    case CameraState::REBOOTING:
+      if (getPitTimeMillis() - ledOnTime < 8000) {
+        writeColor(255-sawTooth(254, 35, ledOnTime, 2000), 0, 0);
+      } else {
+        writeColor(0, sawTooth(220, 1, ledOnTime, 2000), 0);
       }
       break;
     default:
