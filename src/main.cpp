@@ -145,8 +145,6 @@ void setup() {
   // Write I2C initial register values.
   registers[REG_TYPE] = 0xCA;
   registers[REG_VERSION] = VERSION;
-  
-  registers[REG_TC2_AGENT_READY] = 2; // TODO Have this initialized to 0 and be updated by tc2-agent.
 
   // Setup I2C
   Wire.begin(I2C_ADDRESS);
@@ -540,12 +538,13 @@ void powerOnRPi() {
 
 void poweringOffRPi() {
   writeCameraState(CameraState::POWERING_OFF);
-  // TODO tc2-agent register set to 0 
+  registers[REG_TC2_AGENT_READY] = 0;
   poweringOffTime = getPitTimeMillis();
 }
 
 void powerRPiOffNow() {
   writeCameraState(CameraState::POWERED_OFF);
+  registers[REG_TC2_AGENT_READY] = 0;
   digitalWrite(EN_5V, LOW);
 }
 
