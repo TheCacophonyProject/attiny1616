@@ -11,7 +11,7 @@
 
 //=====DEFINITIONS=====//
 #define BATTERY_HYSTERESIS 10
-#define BUTTON_LONG_PRESS_DURATION 2000
+#define BUTTON_LONG_PRESS_DURATION 1200
 
 //=====I2C DEFINITIONS=====//
 #define I2C_ADDRESS 0x25
@@ -565,7 +565,7 @@ void requestPiCommand(uint8_t command) {
 //============================ BUTTON FUNCTIONS =============================//
 // Records the duration that the button was pressed.
 // If less than 50 then ignore, probably debounce.
-// From 50 to 2999, ask the RPi to start communications.
+// From 5 to 2999, ask the RPi to start communications.
 // 3000 or above, shut down RPi then restart ATtiny1616 after 5 seconds.
 // After being processed the buttonPressDuration is reset to 0.
 volatile unsigned long buttonPressDuration = 0;
@@ -576,20 +576,21 @@ void buttonWakeUp() {
     return;
   }}
   unsigned long start = getPitTimeMillis();
+  buttonPressDuration = 0;
   while (digitalRead(BUTTON) == LOW) {
-    if (getPitTimeMillis() - start > BUTTON_LONG_PRESS_DURATION) {
+    if (buttonPressDuration > BUTTON_LONG_PRESS_DURATION) {
       statusLED.writeColor(0x000000);
     } else {
       statusLED.writeColor(0xFFFFFF);
     }
     delay(1);
+    buttonPressDuration++;
   }
   updateLEDs();
-  buttonPressDuration = getPitTimeMillis() - start;
 }
 
 void processButtonPress() {
-  if (buttonPressDuration < 10) {
+  if (buttonPressDuration < 5) {
     buttonPressDuration = 0;
     return;
   } else if (buttonPressDuration < BUTTON_LONG_PRESS_DURATION) {
