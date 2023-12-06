@@ -517,6 +517,7 @@ void requestEvent() {
 //=============================ISR DEFINITIONS==================================//
 // Function attached to the pin connected to the alarm pin on the RTC.
 void rtcWakeUp() {
+  registers[REG_RP2040_PI_POWER_CTRL] = 0;
   if (cameraState == CameraState::POWERED_OFF) {
     checkForLowBattery();
     powerOnRP2040();
