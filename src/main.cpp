@@ -176,7 +176,8 @@ void loop() {
   regBatteryLVDivUpdate();
   regBatteryHVDivUpdate();
   regBatteryRTCUpdate();
-  checkRegSleep();
+  //checkRegSleep();
+  checkRegRP2040PiPowerCtrl();
   //checkWakeUpPiReg();
   //}
 
@@ -408,22 +409,28 @@ void regBatteryRTCUpdate() {
   }
 }
 
-//TODO
-// checkRegSleep
-// 0: Not sleeping.
-// 1 << 0: Request RPi to power down.   // Pi Needed by RO2040
-// 1 << 1: Power off RP2040.            // RP2040 not needed to be powered on any more.
-// 
-// 0: Keep Pi on adn RP2040 on.
-void checkRegSleep() {
-  if (registers[REG_RP2040_PI_POWER_CTRL] & (0x01 << 0)) {
-    requestPiCommand(POWER_OFF_RPI);
-    poweringOffRPi(); // TODO make the pi signal to the ATtiny when it is going to sleep instead.
-    registers[REG_RP2040_PI_POWER_CTRL] = registers[REG_RP2040_PI_POWER_CTRL] & ~(0x01 << 0);
+void checkRegRP2040PiPowerCtrl() {
+  if (registers[REG_RP2040_PI_POWER_CTRL] & (0x01 << 0) == 0) {
+    // RP2040 does not require the RPi to be powered on.
+    // Do not directly power off the RPi, instead the RPi will read this (//TODO) to check if it can power off.
+  } else {
+    // RP2040 requires the RPi to be powered on. (RPi will read this so it knows to stay on, //TODO)
+    // If RPi is off, then power it on.
+    if (cameraState == CameraState::POWERED_OFF) {
+      powerOnRPi();
+    }
   }
-  if (registers[REG_RP2040_PI_POWER_CTRL] & (0x01 << 1)) {
-    rp2040ReadyToPowerOff = true;   // TODO Need a way of setting this to false again if the RP2040 should no longer be powered off. 
-    registers[REG_RP2040_PI_POWER_CTRL] = registers[REG_RP2040_PI_POWER_CTRL] & ~(0x01 << 1);
+
+  if (registers[REG_RP2040_PI_POWER_CTRL] & (0x01 << 1) == 0) {
+    // RP2040 needs to be powered on.
+    powerOnRP2040();
+  } else {
+    // Power off RP2040 if the Raspberry Pi is powered off
+    if (cameraState == CameraState::POWERED_OFF) {
+      powerOffRP2040();
+    } else {
+      powerOnRP2040();
+    }
   }
 }
 

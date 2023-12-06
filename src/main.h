@@ -38,5 +38,6 @@ void regBatteryRTCUpdate();
 void regBatteryHVDivUpdate();
 void regBatteryLVDivUpdate();
 void checkForLowBattery();
+void checkRegRP2040PiPowerCtrl();
 
 #endif // MAIN_H
