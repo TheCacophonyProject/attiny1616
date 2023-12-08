@@ -20,7 +20,7 @@
 class StatusLED {
     public:
         void error(ErrorCode);
-        void updateLEDs(CameraState, CameraConnectionState);
+        void updateLEDs(CameraState, CameraConnectionState, bool);
         void show();
         void writeColor(uint32_t color);
         void writeColor(uint8_t r, uint8_t g, uint8_t b);

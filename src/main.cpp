@@ -24,7 +24,7 @@
 #define REG_CAMERA_CONNECTION    0x03
 #define REG_PI_COMMANDS          0x04
 #define REG_RP2040_PI_POWER_CTRL 0x05
-
+#define REG_AUX_TERMINAL         0x06
 #define REG_TC2_AGENT_READY      0x07
 
 #define REG_BATTERY_CHECK_CTRL 0x10 //CTRL
@@ -42,10 +42,11 @@
 #define REG_ERRORS3 0x22
 #define REG_ERRORS4 0x23
 
-#define WRITE_CAMERA_STATE_FLAG 0x01
-#define READ_ERRORS_FLAG        0x01 << 1
-#define ENABLE_WIFI_FLAG        0x01 << 2
-#define POWER_OFF_RPI           0x01 << 3
+#define WRITE_CAMERA_STATE_FLAG  0x01
+#define READ_ERRORS_FLAG         0x01 << 1
+#define ENABLE_WIFI_FLAG         0x01 << 2
+#define POWER_OFF_RPI            0x01 << 3
+#define TOGGLE_AUX_TERMINAL_FLAG 0x01 << 4
 
 
 uint8_t registers[REG_LEN] = {0};
@@ -91,6 +92,10 @@ volatile unsigned long poweredOffTime = 0;
 volatile unsigned long piCommandRequestTime = 0;
 #define PI_COMMAND_TIMEOUT 5000
 
+// Timer to check if the button is being pressed in quick succession.
+volatile unsigned long previousButtonPressTime = 0;
+volatile uint8_t quickButtonPressCount = 0;
+#define BUTTON_QUICK_PRESS_DURATION 500
 
 volatile CameraState cameraState = CameraState::POWERING_ON;
 StatusLED statusLED;
@@ -208,7 +213,8 @@ void loop() {
 }
 
 void updateLEDs() {
-  statusLED.updateLEDs(cameraState, static_cast<CameraConnectionState>(registers[REG_CAMERA_CONNECTION]));
+  bool auxEnabled = registers[REG_AUX_TERMINAL] & 0x01;
+  statusLED.updateLEDs(cameraState, static_cast<CameraConnectionState>(registers[REG_CAMERA_CONNECTION]), auxEnabled);
 }
 
 void writeErrorFlag(ErrorCode errorCode, bool flash = true) {
@@ -594,6 +600,14 @@ void buttonWakeUp() {
     delay(1);
     buttonPressDuration++;
   }
+  if (buttonPressDuration > 5) {
+    if (getPitTimeMillis() - previousButtonPressTime < BUTTON_QUICK_PRESS_DURATION) {
+      quickButtonPressCount++;
+    } else {
+      quickButtonPressCount = 0;
+    }
+    previousButtonPressTime = getPitTimeMillis();
+  }
   updateLEDs();
 }
 
@@ -614,6 +628,12 @@ void processButtonPress() {
     } else {
       powerOffRPi();
     }
+  }
+  if (quickButtonPressCount > 10) {
+    quickButtonPressCount = 0;
+    statusLED.writeColor(0xFFFFFF);
+    delay(2000);
+    requestPiCommand(TOGGLE_AUX_TERMINAL_FLAG);
   }
   buttonPressDuration = 0;
 }

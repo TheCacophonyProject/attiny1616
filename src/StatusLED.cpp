@@ -8,7 +8,7 @@
 #define YELLOW 0xFF8300
 #define LED_OFF 0x000000
 
-void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnectionState) {
+void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnectionState, bool auxTerminalEnabled) {
   if (newState != cameraState) {
     ledOnTime = getPitTimeMillis();
     cameraState = newState;
@@ -77,6 +77,11 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
       break;
     
     case CameraState::POWERED_ON:
+      // Flash light when aux terminal is enabled.
+      if (auxTerminalEnabled && getPitTimeMillis() % 1000 < 500) {
+        writeColor(LED_OFF);
+        break;
+      }
       switch (connectionState) {
         case CameraConnectionState::NO_CONNECTION:
           writeColor(BLUE);
