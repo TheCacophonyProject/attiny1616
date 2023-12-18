@@ -14,6 +14,8 @@ enum class CameraConnectionState {
   NO_CONNECTION         = 0x00, // blue
   CONNECTED_TO_WIFI     = 0x01, // green
   HOSTING_HOTSPOT       = 0x02, // yellow
+  WIFI_SETUP            = 0x03, // pulsing green
+  HOTSPOT_SETUP         = 0x04, // pulsing yellow
 };
 
 #endif

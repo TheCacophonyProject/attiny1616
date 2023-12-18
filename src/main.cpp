@@ -74,7 +74,7 @@ volatile unsigned long poweringOnTime = 0;
 // If it has not been communicated for over PI_COMMS_INTERVAL it will request comms from the RPi.
 volatile unsigned long lastPiCommsTime = 0;
 //#define WDT_RESET_INTERVAL 30000
-#define PI_COMMS_INTERVAL 10000
+#define PI_COMMS_INTERVAL 100000
 
 // Time from getPitTimeMillis() of when the camera asked to be turned off.
 // After a set about of time in ms the camera is defined from POWER_OFF_DELAY_MS it will then power off the camera.
@@ -103,6 +103,7 @@ StatusLED statusLED;
 volatile bool quickFlash = false;
 
 void setup() {
+  PORTMUX_CTRLC |= PORTMUX_TCA00_bm;
   // Initialize Pins
   pinMode(LED_R, OUTPUT);
   pinMode(LED_G, OUTPUT);
@@ -124,13 +125,12 @@ void setup() {
 
   // Check for a low battery.
   checkForLowBattery();
-
   statusLED.writeColor(255, 0, 0);
-  delay(100);
+  delay(1000);
   statusLED.writeColor(0, 255, 0);
-  delay(100);
+  delay(1000);
   statusLED.writeColor(0, 0, 255);
-  delay(100);
+  delay(1000);
   statusLED.writeColor(0, 0, 0);
 
   // Write I2C register write masks.

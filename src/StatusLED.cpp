@@ -56,7 +56,7 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
 
   switch (cameraState) {
     case CameraState::POWERING_ON:
-      writeColor(0, sawTooth(220, 1, ledOnTime, 2000), 0);
+      writeColor(0, 0, sawTooth(220, 1, ledOnTime, 2000));
       break;
     case CameraState::POWERING_OFF:
       writeColor(255-sawTooth(254, 35, ledOnTime, 2000), 0, 0);
@@ -78,9 +78,9 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
     
     case CameraState::POWERED_ON:
       // Flash light when aux terminal is enabled.
-      if (auxTerminalEnabled && getPitTimeMillis() % 1000 < 500) {
-        writeColor(LED_OFF);
-        break;
+      if (auxTerminalEnabled && getPitTimeMillis() % 1000 < 200) {
+        //writeColor(LED_OFF);
+        //break;
       }
       switch (connectionState) {
         case CameraConnectionState::NO_CONNECTION:
@@ -92,6 +92,12 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
         case CameraConnectionState::HOSTING_HOTSPOT:
           writeColor(YELLOW);
           break;
+        case CameraConnectionState::WIFI_SETUP:
+          writeColor(0, sawTooth(220, 1, ledOnTime, 2000), 0);
+          break;
+        case CameraConnectionState::HOTSPOT_SETUP:
+          writeColor(sawTooth(0xFF, 1, ledOnTime, 2000), sawTooth(0x83, 1, ledOnTime, 2000), 0);
+          break;
         default:
           error(ErrorCode::INVALID_CAMERA_STATE);
           break;
@@ -101,7 +107,7 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
       if (getPitTimeMillis() - ledOnTime < 8000) {
         writeColor(255-sawTooth(254, 35, ledOnTime, 2000), 0, 0);
       } else {
-        writeColor(0, sawTooth(220, 1, ledOnTime, 2000), 0);
+        writeColor(0, 0, sawTooth(220, 1, ledOnTime, 2000));
       }
       break;
     default:
@@ -167,6 +173,12 @@ void StatusLED::writeColor(uint8_t r, uint8_t g, uint8_t b) {
   // Low is on and High is off so am flipping the bits.
   analogWrite(LED_R, uint8_t(~r));
   analogWrite(LED_G, uint8_t(~g));
-  analogWrite(LED_B, uint8_t(~b));
+  if (b > 0) {
+    TCA0.SPLIT.LCMP0 = uint8_t(~b);
+    TCA0.SPLIT.CTRLB |=  TCA_SPLIT_LCMP0EN_bm;
+  } else {
+    TCA0.SPLIT.CTRLB &= ~TCA_SPLIT_LCMP0EN_bm;
+    digitalWrite(LED_B, HIGH);
+  }
 }
 
