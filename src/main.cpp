@@ -81,9 +81,9 @@ volatile unsigned long lastPiCommsTime = 0;
 volatile unsigned long poweringOffTime = 0;
 #define POWER_OFF_DELAY_MS 60000
 
-// Timer to check that the ATtiny is woken up by the RTC_ALARM interrupt after at least 24 hours. 
+// Timer to check that the ATtiny is woken up by the RTC_ALARM interrupt after at least 24 hours.
 // If reaches MAX_POWERED_OFF_DURATION_MS then the camera is reset and a SLEEP_ error flag is set in the I2C register
-volatile unsigned long poweredOffTime = 0; 
+volatile unsigned long poweredOffTime = 0;
 #define MAX_POWERED_OFF_DURATION_MS 86400000
 
 // Time from getPitTimeMillis() of when the ATtiny requested communications from the Raspberry Pi.
@@ -133,11 +133,12 @@ void setup() {
   delay(100);
   statusLED.writeColor(0, 0, 0);
 
+
   // Write I2C register write masks.
   for (int i = 0; i < REG_LEN; i++) {
     writeMasks[i] = 0xFF;
   }
-  writeMasks[REG_VERSION] = 0x00; 
+  writeMasks[REG_VERSION] = 0x00;
   writeMasks[REG_TYPE] = 0x00;
   writeMasks[REG_BATTERY_CHECK_CTRL] = 0x03; // Only allow writing to bits to turn on or off battery check.
   writeMasks[REG_BATTERY_LV_DIV_VAL1] = 0x01 << 7;
@@ -146,7 +147,7 @@ void setup() {
   writeMasks[REG_BATTERY_HV_DIV_VAL2] = 0x00;
   writeMasks[REG_BATTERY_RTC_VAL1] = 0x01 << 7;
   writeMasks[REG_BATTERY_RTC_VAL2] = 0x00;
-  
+
   // Write I2C initial register values.
   registers[REG_TYPE] = 0xCA;
   registers[REG_VERSION] = VERSION;
@@ -223,7 +224,7 @@ void writeErrorFlag(ErrorCode errorCode, bool flash = true) {
   uint8_t regBit = errorCodeUint%8;
   uint8_t reg = REG_ERRORS1 + regOffset;
   registers[reg] |= 1 << regBit;
-  // TODO save error registers to EEPROM so can be restored on reboot 
+  // TODO save error registers to EEPROM so can be restored on reboot
   if (flash) {
     statusLED.error(errorCode);
   }
@@ -273,7 +274,7 @@ void checkBatteryHighVoltageDivider() {
 void checkBatteryLowVoltageDivider() {
   checkBatteryHighVoltageDivider();
   if (battHighVoltageDiv > 340) { // TODO Find proper value for this.
-    // If battery voltage is too high the low voltage divider won't work and 
+    // If battery voltage is too high the low voltage divider won't work and
     // should be set to an LOW output to prevent high voltages on the pin.
     digitalWrite(LV_BAT_SENSE, LOW);
     pinMode(LV_BAT_SENSE, OUTPUT);
@@ -305,13 +306,13 @@ void checkForLowBattery() {
   }
 
   powerRPiOffNow();
-  
+
   // Flash LED to show battery is low
   for (int i = 0; i < 3; i++) {
     statusLED.writeColor(0xFF, 0x00, 0x00);
     delay(300);
     statusLED.writeColor(0x00, 0x00, 0x00);
-    delay(300);  
+    delay(300);
   }
 
   // Loop checking battery voltage until battery is better
@@ -329,7 +330,7 @@ void checkForLowBattery() {
     }
 
     // TODO go to deep sleep.
-    // Wait for PIT to wake up again and then check battery. 
+    // Wait for PIT to wake up again and then check battery.
   }
   */
 }
@@ -419,6 +420,9 @@ void checkRegRP2040PiPowerCtrl() {
   if (registers[REG_RP2040_PI_POWER_CTRL] & (0x01 << 0) == 0) {
     // RP2040 does not require the RPi to be powered on.
     // Do not directly power off the RPi, instead the RPi will read this (//TODO) to check if it can power off.
+    //if (cameraState == CameraState::POWERED_ON) {
+        powerRPiOffNow();
+    //}
   } else {
     // RP2040 requires the RPi to be powered on. (RPi will read this so it knows to stay on, //TODO)
     // If RPi is off, then power it on.
@@ -488,7 +492,7 @@ void receiveEvent(int howMany) {
     }
 
     registerAddress = address;
-    
+
     // Write data to register.
     if (Wire.available()) {
       // Disable the low battery check if changing the low battery value.
@@ -514,7 +518,7 @@ void receiveEvent(int howMany) {
 
 // Best to just read one register at a time, this is explained further in this example.
 // https://github.com/SpenceKonde/megaTinyCore/blob/master/megaavr/libraries/Wire/examples/register_model/register_model.ino
-// TODO Set it up so it 
+// TODO Set it up so it
 void requestEvent() {
   Wire.write(registers[registerAddress]);
   //quickFlash = true;
