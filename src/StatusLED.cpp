@@ -79,8 +79,8 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
     case CameraState::POWERED_ON:
       // Flash light when aux terminal is enabled.
       if (auxTerminalEnabled && getPitTimeMillis() % 1000 < 200) {
-        //writeColor(LED_OFF);
-        //break;
+        writeColor(LED_OFF);
+        break;
       }
       switch (connectionState) {
         case CameraConnectionState::NO_CONNECTION:
