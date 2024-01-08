@@ -126,11 +126,11 @@ void setup() {
   // Check for a low battery.
   checkForLowBattery();
   statusLED.writeColor(255, 0, 0);
-  delay(1000);
+  delay(100);
   statusLED.writeColor(0, 255, 0);
-  delay(1000);
+  delay(100);
   statusLED.writeColor(0, 0, 255);
-  delay(1000);
+  delay(100);
   statusLED.writeColor(0, 0, 0);
 
   // Write I2C register write masks.
@@ -248,6 +248,7 @@ void checkPiCommands() {
 
   // Drive PI_COMMAND_PIN low to get Raspberry Pi to check what commands to run
   if (registers[REG_PI_COMMANDS] == 0) {
+    //TODO Only drive the pin high when the pi is powered on.
     digitalWrite(PI_COMMAND_PIN, HIGH);
   } else {
     digitalWrite(PI_COMMAND_PIN, LOW);
