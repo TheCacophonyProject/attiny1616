@@ -22,7 +22,7 @@ void powerOnPRi();
 void processButtonPress();
 void buttonWakeUp();
 void powerOnRPi();
-void powerOffRPi();
+void requestRPiPowerOff();
 void rtcWakeUp();
 void powerRPiOffNow();
 void checkWakeUpPiReg();

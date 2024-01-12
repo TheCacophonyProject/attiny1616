@@ -97,6 +97,9 @@ volatile unsigned long previousButtonPressTime = 0;
 volatile uint8_t quickButtonPressCount = 0;
 #define BUTTON_QUICK_PRESS_DURATION 500
 
+
+volatile unsigned long poweredOnTime = 0;
+
 volatile CameraState cameraState = CameraState::POWERING_ON;
 StatusLED statusLED;
 
@@ -120,7 +123,7 @@ void setup() {
   pinMode(BUTTON, INPUT_PULLUP);
   pinMode(PI_POWERED_OFF, INPUT_PULLUP);
   pinMode(PI_COMMAND_PIN, OUTPUT);
-  digitalWrite(PI_COMMAND_PIN, HIGH);
+  digitalWrite(PI_COMMAND_PIN, LOW);
   statusLED.writeColor(0, 0, 0);
 
   // Check for a low battery.
@@ -241,19 +244,16 @@ void checkPiCommsCountdown() {
 
 void checkPiCommands() {
   // Check if the Raspberry Pi is responding to command requests
-//  if (registers[REG_PI_COMMANDS] != 0 && cameraState == CameraState::POWERED_ON) {
-//    registers[REG_PI_COMMANDS] = 0;
-//  }
   if (registers[REG_PI_COMMANDS] != 0  &&
       getPitTimeMillis() - piCommandRequestTime > PI_COMMAND_TIMEOUT &&
-      cameraState == CameraState::POWERED_ON) {
+      cameraState == CameraState::POWERED_ON &&
+      getPitTimeMillis() - poweredOnTime > PI_COMMAND_TIMEOUT) {
     writeErrorFlag(ErrorCode::PI_COMMAND_TIMEDOUT);
     registers[REG_PI_COMMANDS] = 0;
   }
 
   // Drive PI_COMMAND_PIN low to get Raspberry Pi to check what commands to run
-  if (registers[REG_PI_COMMANDS] == 0) {
-    //TODO Only drive the pin high when the pi is powered on.
+  if (registers[REG_PI_COMMANDS] == 0 && cameraState == CameraState::POWERED_ON) {
     digitalWrite(PI_COMMAND_PIN, HIGH);
   } else {
     digitalWrite(PI_COMMAND_PIN, LOW);
@@ -395,10 +395,10 @@ void writeCameraState(CameraState newCameraState) {
   if (newCameraState != cameraState) {
     cameraState = newCameraState;
     updateLEDs();
+    if (cameraState == CameraState::POWERED_ON) {
+      poweredOnTime = getPitTimeMillis();
+    }
   }
-  if (cameraState != CameraState::POWERED_ON) {
-    registers[REG_PI_COMMANDS] = 0;
-  } 
   registers[REG_CAMERA_STATE] = static_cast<uint8_t>(cameraState);
 }
 //============================== I2C Register FUNCTIONS ==============================//
@@ -572,9 +572,10 @@ void powerRPiOffNow() {
   writeCameraState(CameraState::POWERED_OFF);
   registers[REG_TC2_AGENT_READY] = 0;
   digitalWrite(EN_5V, LOW);
+  registers[REG_PI_COMMANDS] = 0;
 }
 
-void powerOffRPi() {
+void requestRPiPowerOff() {
   digitalWrite(PI_SHUTDOWN, LOW);
   poweringOffRPi();
   delay(100);
@@ -638,7 +639,7 @@ void processButtonPress() {
     if (cameraState == CameraState::POWERED_OFF) {
       powerOnRPi();
     } else {
-      powerOffRPi();
+      requestRPiPowerOff();
     }
   }
   if (quickButtonPressCount > 10) {
