@@ -241,7 +241,12 @@ void checkPiCommsCountdown() {
 
 void checkPiCommands() {
   // Check if the Raspberry Pi is responding to command requests
-  if (registers[REG_PI_COMMANDS] != 0 &&  getPitTimeMillis() - piCommandRequestTime > PI_COMMAND_TIMEOUT) {
+//  if (registers[REG_PI_COMMANDS] != 0 && cameraState == CameraState::POWERED_ON) {
+//    registers[REG_PI_COMMANDS] = 0;
+//  }
+  if (registers[REG_PI_COMMANDS] != 0  &&
+      getPitTimeMillis() - piCommandRequestTime > PI_COMMAND_TIMEOUT &&
+      cameraState == CameraState::POWERED_ON) {
     writeErrorFlag(ErrorCode::PI_COMMAND_TIMEDOUT);
     registers[REG_PI_COMMANDS] = 0;
   }
@@ -345,7 +350,10 @@ void checkCameraState() {
 
   // Check if the camera has had a power on timeout.
   if (cameraState == CameraState::POWERING_ON && getPitTimeMillis() - poweringOnTime > MAX_POWERING_ON_DURATION_MS) {
-    writeCameraState(CameraState::POWER_ON_TIMEOUT);
+    powerRPiOffNow();
+    delay(1000);
+    powerOnRPi();
+    //writeCameraState(CameraState::POWER_ON_TIMEOUT);  //TODO do we need this state?
     writeErrorFlag(ErrorCode::POWER_ON_FAILED);
     return;
   }
@@ -388,6 +396,9 @@ void writeCameraState(CameraState newCameraState) {
     cameraState = newCameraState;
     updateLEDs();
   }
+  if (cameraState != CameraState::POWERED_ON) {
+    registers[REG_PI_COMMANDS] = 0;
+  } 
   registers[REG_CAMERA_STATE] = static_cast<uint8_t>(cameraState);
 }
 //============================== I2C Register FUNCTIONS ==============================//
@@ -416,28 +427,29 @@ void regBatteryRTCUpdate() {
   }
 }
 
+bool isBitSet(uint8_t reg, uint8_t bitPos) {
+    return (reg & (1 << bitPos)) != 0;
+}
+
 void checkRegRP2040PiPowerCtrl() {
-  if (registers[REG_RP2040_PI_POWER_CTRL] & (0x01 << 0) == 0) {
-    // RP2040 does not require the RPi to be powered on.
-    // Do not directly power off the RPi, instead the RPi will read this (//TODO) to check if it can power off.
-  } else {
+  if (isBitSet(registers[REG_RP2040_PI_POWER_CTRL], 0)) {
     // RP2040 requires the RPi to be powered on. (RPi will read this so it knows to stay on, //TODO)
     // If RPi is off, then power it on.
     if (cameraState == CameraState::POWERED_OFF) {
       powerOnRPi();
     }
-  }
+  } // If this bit is not set it is up to the RPi to decide when to power itself off.
 
-  if (registers[REG_RP2040_PI_POWER_CTRL] & (0x01 << 1) == 0) {
-    // RP2040 needs to be powered on.
-    powerOnRP2040();
-  } else {
+  if (isBitSet(registers[REG_RP2040_PI_POWER_CTRL], 1)) {
     // Power off RP2040 if the Raspberry Pi is powered off
     if (cameraState == CameraState::POWERED_OFF) {
       powerOffRP2040();
     } else {
       powerOnRP2040();
     }
+  } else {
+    // If bit is not set the RP2040 should be powered on.
+    powerOnRP2040();
   }
 }
 
@@ -518,7 +530,6 @@ void receiveEvent(int howMany) {
 // TODO Set it up so it 
 void requestEvent() {
   Wire.write(registers[registerAddress]);
-  //quickFlash = true;
 }
 
 //=============================ISR DEFINITIONS==================================//
