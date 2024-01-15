@@ -398,6 +398,9 @@ void writeCameraState(CameraState newCameraState) {
     if (cameraState == CameraState::POWERED_ON) {
       poweredOnTime = getPitTimeMillis();
     }
+    if (cameraState == CameraState::POWERING_OFF) {
+      poweringOffTime = getPitTimeMillis();
+    }
   }
   registers[REG_CAMERA_STATE] = static_cast<uint8_t>(cameraState);
 }
