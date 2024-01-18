@@ -444,11 +444,11 @@ void checkRegRP2040PiPowerCtrl() {
   } // If this bit is not set it is up to the RPi to decide when to power itself off.
 
   if (isBitSet(registers[REG_RP2040_PI_POWER_CTRL], 1)) {
-    // Power off RP2040 if the Raspberry Pi is powered off
-    if (cameraState == CameraState::POWERED_OFF) {
-      powerOffRP2040();
-    } else {
+    // Keep RP2040 on while RPi is powered on
+    if (cameraState == CameraState::POWERED_ON) {
       powerOnRP2040();
+    } else {
+      powerOffRP2040();
     }
   } else {
     // If bit is not set the RP2040 should be powered on.
@@ -565,12 +565,6 @@ void powerOnRPi() {
   poweringOnTime = getPitTimeMillis();
 }
 
-void poweringOffRPi() {
-  writeCameraState(CameraState::POWERING_OFF);
-  registers[REG_TC2_AGENT_READY] = 0;
-  poweringOffTime = getPitTimeMillis();
-}
-
 void powerRPiOffNow() {
   writeCameraState(CameraState::POWERED_OFF);
   registers[REG_TC2_AGENT_READY] = 0;
@@ -580,7 +574,9 @@ void powerRPiOffNow() {
 
 void requestRPiPowerOff() {
   digitalWrite(PI_SHUTDOWN, LOW);
-  poweringOffRPi();
+  writeCameraState(CameraState::POWERING_OFF);
+  registers[REG_TC2_AGENT_READY] = 0;
+  poweringOffTime = getPitTimeMillis();
   delay(100);
   digitalWrite(PI_SHUTDOWN, HIGH);
 }
@@ -641,8 +637,12 @@ void processButtonPress() {
   } else {
     if (cameraState == CameraState::POWERED_OFF) {
       powerOnRPi();
+      registers[REG_RP2040_PI_POWER_CTRL] = 0;
     } else {
+      powerOffRP2040();
       requestRPiPowerOff();
+      delay(200);
+      registers[REG_RP2040_PI_POWER_CTRL] = 0x02;
     }
   }
   if (quickButtonPressCount > 10) {
