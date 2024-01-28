@@ -67,7 +67,7 @@ volatile bool rp2040ReadyToPowerOff = false;  // Need to wait for RPi to power o
 // After 5 minutes a error code shoule be shown on the LED of the camera.
 // After 30 minutes the camera is reset and a MAX_POWERING_ON_DURATION_MS error flag is set in the I2C register.
 volatile unsigned long poweringOnTime = 0;
-#define MAX_POWERING_ON_DURATION_MS 300000
+#define MAX_POWERING_ON_DURATION_MS 3000000
 //#define MAX_POWERING_ON_DURATION_MS 10000
 
 // Time from getPitTimeMillis() of the last time the ATtiny was communicated with the RPi.
@@ -172,7 +172,7 @@ void setup() {
 void loop() {
   if (quickFlash) {
     statusLED.writeColor(255, 255, 255);
-    delay(50);
+    delay(100);
     statusLED.writeColor(0, 0, 0);
     quickFlash = false;
   }
@@ -488,51 +488,123 @@ void lowBatteryRegUpdate() {
 
 
 //============================== I2C FUNCTIONS ==============================//
+uint16_t crcCalc(const uint8_t *data, size_t length) {
+    uint16_t crc = 0x1D0F;
+    for (size_t i = 0; i < length; i++) {
+        crc = crc ^ ((uint16_t)data[i] << 8);
+        for (uint8_t j = 0; j < 8; j++) {
+            if (crc & 0x8000) {
+                crc = (crc << 1) ^ 0x1021;
+            } else {
+                crc = crc << 1;
+            }
+        }
+    }
+    return crc;
+}
+
 void receiveEvent(int howMany) {
-  while(Wire.available()) {
-    uint8_t address = Wire.read();
-    // Prevent from writing/reading to registers outside of the range.
-    if (address >= REG_LEN) {
-      while(Wire.available()) {
-        Wire.read();
-        writeErrorFlag(ErrorCode::INVALID_REG_ADDRESS);
-        return;
-      }
+  #define BUFFER_SIZE 10
+  uint8_t buffer[BUFFER_SIZE];
+  // Read all incoming data into buffer
+  int size = 0;
+  while (Wire.available() && size < BUFFER_SIZE) {
+    buffer[size++] = uint8_t(Wire.read());
+  }
+  
+  // Ignore empty data
+  if (size == 0){
+    // Clear data
+    while (Wire.available()) {
+      Wire.read();
     }
-    if (address == REG_CAMERA_STATE) {
-      lastPiCommsTime = getPitTimeMillis();
+    return;
+  }
+
+  if (size < 3) {
+    writeErrorFlag(ErrorCode::BAD_I2C_LENGTH_SMALL);
+    // Clear data
+    while (Wire.available()) {
+      Wire.read();
     }
+    return;
+  }
 
-    registerAddress = address;
-    
-    // Write data to register.
-    if (Wire.available()) {
-      // Disable the low battery check if changing the low battery value.
-      if (registerAddress == REG_BATTERY_LOW_VAL2 || registerAddress == REG_BATTERY_LOW_VAL1) {
-        registers[REG_BATTERY_CHECK_CTRL] = 0;
-      }
+  if (size > 4) {    
+    writeErrorFlag(ErrorCode::BAD_I2C_LENGTH_BIG);
+    // Clear data
+    while (Wire.available()) {
+      Wire.read();
+    }
+    return;
+  }
 
-      uint8_t data = Wire.read();
-      uint8_t readOnlyData = registers[registerAddress] & ~writeMasks[registerAddress]; // Register read only values.
-      uint8_t writeData = data & writeMasks[registerAddress];                           // Register new values to write
-      // If writeData and data are not the same then there was an attempt to write to a read only register, so cancel write.
-      if (writeData != data) {
-        writeErrorFlag(ErrorCode::WRITE_TO_READ_ONLY);
-        return;
-      }
+  if (Wire.available()) {
+    writeErrorFlag(ErrorCode::BAD_I2C);
+    // Clear data
+    while (Wire.available()) {
+      Wire.read();
+    }
+    return;
+  }
+  
+  uint16_t receivedCRC = ((uint16_t)buffer[size - 2] << 8) | buffer[size - 1];
+  uint16_t calculatedCRC = crcCalc(buffer, size - 2);
+  if (receivedCRC != calculatedCRC) {
+    writeErrorFlag(ErrorCode::CRC_ERROR);
+    return;
+  }
 
-      // Combine read only bits and new write bits into the register.
-      registers[registerAddress] = readOnlyData | writeData;
-      registersWrittenTo = true;
+  // Process data if CRC is valid
+  //for (int i = 0; i < index - 2; ++i) {
+  uint8_t address = buffer[0];
+  //uint8_t address = Wire.read();
+  // Prevent from writing/reading to registers outside of the range.
+  if (address >= REG_LEN) {
+    while(Wire.available()) {
+      Wire.read();
+      writeErrorFlag(ErrorCode::INVALID_REG_ADDRESS);
+      return;
     }
   }
+  if (address == REG_CAMERA_STATE) {
+    lastPiCommsTime = getPitTimeMillis();
+  }
+
+  registerAddress = address;
+  
+  // Write data to register.
+  if (size == 4) {
+    // Disable the low battery check if changing the low battery value.
+    if (registerAddress == REG_BATTERY_LOW_VAL2 || registerAddress == REG_BATTERY_LOW_VAL1) {
+      registers[REG_BATTERY_CHECK_CTRL] = 0;
+    }
+
+    uint8_t data = buffer[1];
+    uint8_t readOnlyData = registers[registerAddress] & ~writeMasks[registerAddress]; // Register read only values.
+    uint8_t writeData = data & writeMasks[registerAddress];                           // Register new values to write
+    // If writeData and data are not the same then there was an attempt to write to a read only register, so cancel write.
+    if (writeData != data) {
+      writeErrorFlag(ErrorCode::WRITE_TO_READ_ONLY);
+      return;
+    }
+
+    // Combine read only bits and new write bits into the register.
+    registers[registerAddress] = readOnlyData | writeData;
+    registersWrittenTo = true;
+  }
+  
 }
 
 // Best to just read one register at a time, this is explained further in this example.
 // https://github.com/SpenceKonde/megaTinyCore/blob/master/megaavr/libraries/Wire/examples/register_model/register_model.ino
 // TODO Set it up so it 
+// TODO use Wire.getBytesRead();
 void requestEvent() {
-  Wire.write(registers[registerAddress]);
+  uint8_t data[] = {registers[registerAddress]};
+  uint16_t crc = crcCalc(data, 1);
+  uint8_t payload[3] = {registers[registerAddress], crc >> 8, crc & 0xff};
+  Wire.write(payload, 3);
 }
 
 //=============================ISR DEFINITIONS==================================//
@@ -549,7 +621,7 @@ void rtcWakeUp() {
 void powerOnRP2040() {
   rp2040ReadyToPowerOff = false;
   checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
-  digitalWrite(EN_RP2040, LOW);
+  digitalWrite(EN_RP2040, HIGH);
 }
 
 void powerOffRP2040() {
