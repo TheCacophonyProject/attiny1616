@@ -67,8 +67,7 @@ volatile bool rp2040ReadyToPowerOff = false;  // Need to wait for RPi to power o
 // After 5 minutes a error code shoule be shown on the LED of the camera.
 // After 30 minutes the camera is reset and a MAX_POWERING_ON_DURATION_MS error flag is set in the I2C register.
 volatile unsigned long poweringOnTime = 0;
-#define MAX_POWERING_ON_DURATION_MS 3000000
-//#define MAX_POWERING_ON_DURATION_MS 10000
+#define MAX_POWERING_ON_DURATION_MS 300000
 
 // Time from getPitTimeMillis() of the last time the ATtiny was communicated with the RPi.
 // If it has not been communicated for over PI_COMMS_INTERVAL it will request comms from the RPi.
@@ -621,7 +620,7 @@ void rtcWakeUp() {
 void powerOnRP2040() {
   rp2040ReadyToPowerOff = false;
   checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
-  digitalWrite(EN_RP2040, HIGH);
+  digitalWrite(EN_RP2040, LOW);
 }
 
 void powerOffRP2040() {
@@ -638,6 +637,7 @@ void powerOnRPi() {
 }
 
 void powerRPiOffNow() {
+  poweredOffTime = getPitTimeMillis();  //TODO Tets this
   writeCameraState(CameraState::POWERED_OFF);
   registers[REG_TC2_AGENT_READY] = 0;
   digitalWrite(EN_5V, LOW);
