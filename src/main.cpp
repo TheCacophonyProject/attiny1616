@@ -7,7 +7,8 @@
 #include <timer.h>
 #include <avr/io.h>
 
-#define VERSION 12
+#define MAJOR_VERSION 12 // Needs to be updated if the compatibility will change with tc2-agent, tc2-firmware, or tc2-hat-controller
+#define MINOR_VERSION 1  // Update for just small bug fixes that doesn't cause compatibility issues with other software.
 
 //=====DEFINITIONS=====//
 #define BATTERY_HYSTERESIS 10
@@ -19,13 +20,14 @@
 
 // Check registers.md for details on registers functions. //TODO, update registers.md
 #define REG_TYPE                 0x00
-#define REG_VERSION              0x01
+#define REG_MAJOR_VERSION        0x01
 #define REG_CAMERA_STATE         0x02
 #define REG_CAMERA_CONNECTION    0x03
 #define REG_PI_COMMANDS          0x04
 #define REG_RP2040_PI_POWER_CTRL 0x05
 #define REG_AUX_TERMINAL         0x06
 #define REG_TC2_AGENT_READY      0x07
+#define REG_MINOR_VERSION        0x08
 
 #define REG_BATTERY_CHECK_CTRL 0x10 //CTRL
 #define REG_BATTERY_LOW_VAL1   0x11 //LOW 1
@@ -139,7 +141,8 @@ void setup() {
   for (int i = 0; i < REG_LEN; i++) {
     writeMasks[i] = 0xFF;
   }
-  writeMasks[REG_VERSION] = 0x00; 
+  writeMasks[REG_MAJOR_VERSION] = 0x00;
+  writeMasks[REG_MINOR_VERSION] = 0x00;
   writeMasks[REG_TYPE] = 0x00;
   writeMasks[REG_BATTERY_CHECK_CTRL] = 0x03; // Only allow writing to bits to turn on or off battery check.
   writeMasks[REG_BATTERY_LV_DIV_VAL1] = 0x01 << 7;
@@ -151,7 +154,8 @@ void setup() {
   
   // Write I2C initial register values.
   registers[REG_TYPE] = 0xCA;
-  registers[REG_VERSION] = VERSION;
+  registers[REG_MAJOR_VERSION] = MAJOR_VERSION;
+  registers[REG_MINOR_VERSION] = MINOR_VERSION;
 
   // Setup I2C
   Wire.begin(I2C_ADDRESS);
