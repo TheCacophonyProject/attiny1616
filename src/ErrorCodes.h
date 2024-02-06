@@ -1,7 +1,6 @@
 #ifndef ERRORCODE_H
 #define ERRORCODE_H
 
-
 enum class ErrorCode {
   POWER_ON_FAILED               = 0x02,  // Timeout in camera powering on.
   WATCHDOG_TIMEOUT              = 0x03,  // Watchdog was triggered.
@@ -13,11 +12,9 @@ enum class ErrorCode {
   PI_COMMAND_TIMEDOUT           = 0x09,  // No ping response.
   RTC_TIMEOUT                   = 0x0A,  // RTC timeout.
   CRC_ERROR                     = 0x0B,  // CRC error in data received.
-  BAD_I2C_LENGTH_SMALL                = 0x0C,  // I2C data length was not 3 bytes.
-  BAD_I2C_LENGTH_BIG                = 0x0D,  // I2C data length was not 3 bytes.
-  BAD_I2C               = 0x0E,  // I2C address was not 0x20.
-
+  BAD_I2C_LENGTH_SMALL          = 0x0C,  // I2C data length was not 3 bytes.
+  BAD_I2C_LENGTH_BIG            = 0x0D,  // I2C data length was not 3 bytes.
+  BAD_I2C                       = 0x0E,
 };
-
 
 #endif
