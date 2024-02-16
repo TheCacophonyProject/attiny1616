@@ -8,7 +8,7 @@
 #include <avr/io.h>
 
 #define MAJOR_VERSION 12 // Needs to be updated if the compatibility will change with tc2-agent, tc2-firmware, or tc2-hat-controller
-#define MINOR_VERSION 1  // Update for just small bug fixes that doesn't cause compatibility issues with other software.
+#define MINOR_VERSION 2  // Update for just small bug fixes that doesn't cause compatibility issues with other software.
 
 //=====DEFINITIONS=====//
 #define BATTERY_HYSTERESIS 10
@@ -28,6 +28,7 @@
 #define REG_AUX_TERMINAL         0x06
 #define REG_TC2_AGENT_READY      0x07
 #define REG_MINOR_VERSION        0x08
+#define REG_FLASH_ERRORS         0x09
 
 #define REG_BATTERY_CHECK_CTRL 0x10 //CTRL
 #define REG_BATTERY_LOW_VAL1   0x11 //LOW 1
@@ -224,6 +225,7 @@ void updateLEDs() {
 }
 
 void writeErrorFlag(ErrorCode errorCode, bool flash = true) {
+  flash = flash && (registers[REG_FLASH_ERRORS] & 0x01);
   uint8_t errorCodeUint = static_cast<uint8_t>(errorCode);
   uint8_t regOffset = errorCodeUint/8;
   uint8_t regBit = errorCodeUint%8;
