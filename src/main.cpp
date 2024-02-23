@@ -398,6 +398,15 @@ void checkCameraState() {
 
 void writeCameraState(CameraState newCameraState) {
   if (newCameraState != cameraState) {
+    // This is to skip setting the state to POWERED_ON on when the camera is powering off.
+    // In the time that the camera takes to power off the tc2-hat-attiny service might set the state to POWERED_ON
+    // because it doesn't know the camera is powering off.
+    if (cameraState  == CameraState::POWERING_OFF &&
+      newCameraState == CameraState::POWERED_ON &&
+      poweringOffTime - getPitTimeMillis() > 10000) {
+      return;
+    }
+
     cameraState = newCameraState;
     updateLEDs();
     if (cameraState == CameraState::POWERED_ON) {

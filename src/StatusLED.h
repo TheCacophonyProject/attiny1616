@@ -53,6 +53,7 @@ class StatusLED {
         unsigned long flashDuration;
 };
 
-uint8_t sawTooth(uint8_t, uint8_t, long, unsigned long);
+uint8_t increasingSawTooth(uint8_t, uint8_t, long, unsigned long);
+uint8_t decreasingSawTooth(uint8_t, uint8_t, long, unsigned long);
 
 #endif
