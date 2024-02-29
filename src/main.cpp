@@ -8,7 +8,7 @@
 #include <avr/io.h>
 
 #define MAJOR_VERSION 12 // Needs to be updated if the compatibility will change with tc2-agent, tc2-firmware, or tc2-hat-controller
-#define MINOR_VERSION 3  // Update for just small bug fixes that doesn't cause compatibility issues with other software.
+#define MINOR_VERSION 4  // Update for just small bug fixes that doesn't cause compatibility issues with other software.
 
 //=====DEFINITIONS=====//
 #define BATTERY_HYSTERESIS 10
@@ -653,10 +653,11 @@ void powerOnRPi() {
 
 void powerRPiOffNow() {
   poweredOffTime = getPitTimeMillis();  //TODO Tets this
+  digitalWrite(EN_5V, LOW);
   writeCameraState(CameraState::POWERED_OFF);
   registers[REG_TC2_AGENT_READY] = 0;
-  digitalWrite(EN_5V, LOW);
   registers[REG_PI_COMMANDS] = 0;
+  registers[REG_CAMERA_CONNECTION] = 0;
 }
 
 void requestRPiPowerOff() {
