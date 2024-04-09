@@ -8,7 +8,7 @@
 #include <avr/io.h>
 
 #define MAJOR_VERSION 12 // Needs to be updated if the compatibility will change with tc2-agent, tc2-firmware, or tc2-hat-controller
-#define MINOR_VERSION 4  // Update for just small bug fixes that doesn't cause compatibility issues with other software.
+#define MINOR_VERSION 5  // Update for just small bug fixes that doesn't cause compatibility issues with other software.
 
 //=====DEFINITIONS=====//
 #define BATTERY_HYSTERESIS 10
@@ -29,6 +29,7 @@
 #define REG_TC2_AGENT_READY      0x07
 #define REG_MINOR_VERSION        0x08
 #define REG_FLASH_ERRORS         0x09
+#define REG_CLEAR_ERRORS         0x0A
 
 #define REG_BATTERY_CHECK_CTRL 0x10 //CTRL
 #define REG_BATTERY_LOW_VAL1   0x11 //LOW 1
@@ -152,7 +153,7 @@ void setup() {
   writeMasks[REG_BATTERY_HV_DIV_VAL2] = 0x00;
   writeMasks[REG_BATTERY_RTC_VAL1] = 0x01 << 7;
   writeMasks[REG_BATTERY_RTC_VAL2] = 0x00;
-  
+
   // Write I2C initial register values.
   registers[REG_TYPE] = 0xCA;
   registers[REG_MAJOR_VERSION] = MAJOR_VERSION;
@@ -536,7 +537,7 @@ void receiveEvent(int howMany) {
   }
 
   if (size < 3) {
-    writeErrorFlag(ErrorCode::BAD_I2C_LENGTH_SMALL);
+    //writeErrorFlag(ErrorCode::BAD_I2C_LENGTH_SMALL);
     // Clear data
     while (Wire.available()) {
       Wire.read();
@@ -545,7 +546,7 @@ void receiveEvent(int howMany) {
   }
 
   if (size > 4) {    
-    writeErrorFlag(ErrorCode::BAD_I2C_LENGTH_BIG);
+    // writeErrorFlag(ErrorCode::BAD_I2C_LENGTH_BIG);
     // Clear data
     while (Wire.available()) {
       Wire.read();
@@ -554,7 +555,7 @@ void receiveEvent(int howMany) {
   }
 
   if (Wire.available()) {
-    writeErrorFlag(ErrorCode::BAD_I2C);
+    //writeErrorFlag(ErrorCode::BAD_I2C);
     // Clear data
     while (Wire.available()) {
       Wire.read();
@@ -565,7 +566,7 @@ void receiveEvent(int howMany) {
   uint16_t receivedCRC = ((uint16_t)buffer[size - 2] << 8) | buffer[size - 1];
   uint16_t calculatedCRC = crcCalc(buffer, size - 2);
   if (receivedCRC != calculatedCRC) {
-    writeErrorFlag(ErrorCode::CRC_ERROR);
+    //writeErrorFlag(ErrorCode::CRC_ERROR);
     return;
   }
 
@@ -592,6 +593,15 @@ void receiveEvent(int howMany) {
     // Disable the low battery check if changing the low battery value.
     if (registerAddress == REG_BATTERY_LOW_VAL2 || registerAddress == REG_BATTERY_LOW_VAL1) {
       registers[REG_BATTERY_CHECK_CTRL] = 0;
+    }
+
+    // Clear errors
+    if (registerAddress == REG_CLEAR_ERRORS && buffer[1] == 0x01) {
+      registers[REG_ERRORS1] = 0x00;
+      registers[REG_ERRORS2] = 0x00;
+      registers[REG_ERRORS3] = 0x00;
+      registers[REG_ERRORS4] = 0x00;
+      return;
     }
 
     uint8_t data = buffer[1];
