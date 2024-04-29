@@ -162,7 +162,6 @@ void setup() {
   Wire.begin(I2C_ADDRESS);
   Wire.onReceive(receiveEvent);
   Wire.onRequest(requestEvent);
-
   // Setup interrupts
   attachInterrupt(digitalPinToInterrupt(RTC_ALARM), rtcWakeUp, FALLING);
   setupPIT();
@@ -520,12 +519,19 @@ uint16_t crcCalc(const uint8_t *data, size_t length) {
 void receiveEvent(int howMany) {
   #define BUFFER_SIZE 10
   uint8_t buffer[BUFFER_SIZE];
+    statusLED.show();
+
   // Read all incoming data into buffer
   int size = 0;
+    statusLED.writeColor(0, 255,0);
+    //green
+
   while (Wire.available() && size < BUFFER_SIZE) {
     buffer[size++] = uint8_t(Wire.read());
   }
-  
+      statusLED.writeColor(0, 0,255);
+  //too blue
+
   // Ignore empty data
   if (size == 0){
     // Clear data
@@ -561,7 +567,8 @@ void receiveEvent(int howMany) {
     }
     return;
   }
-  
+    statusLED.writeColor(0, 255,255); //teal
+
   uint16_t receivedCRC = ((uint16_t)buffer[size - 2] << 8) | buffer[size - 1];
   uint16_t calculatedCRC = crcCalc(buffer, size - 2);
   if (receivedCRC != calculatedCRC) {
@@ -616,6 +623,8 @@ void receiveEvent(int howMany) {
     registers[registerAddress] = readOnlyData | writeData;
     registersWrittenTo = true;
   }
+      statusLED.writeColor(255, 255,0); //yellow
+
   
 }
 
@@ -624,6 +633,10 @@ void receiveEvent(int howMany) {
 // TODO Set it up so it 
 // TODO use Wire.getBytesRead();
 void requestEvent() {
+      statusLED.show();
+
+    statusLED.writeColor(255,0,0); //red
+
   uint8_t data[] = {registers[registerAddress]};
   uint16_t crc = crcCalc(data, 1);
   uint8_t payload[3] = {registers[registerAddress], crc >> 8, crc & 0xff};
