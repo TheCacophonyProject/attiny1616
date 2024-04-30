@@ -173,6 +173,22 @@ void setup() {
   powerOnRPi();
 }
 
+volatile uint8_t sleepMode = SLEEP_MODE_IDLE;
+
+void updateSleepMode() {
+  uint8_t newSleepMode;
+  if (statusLED.isOn()) {
+    newSleepMode = SLEEP_MODE_IDLE;
+  } else {
+    newSleepMode = SLEEP_MODE_PWR_DOWN;
+  }
+  bool alwaysUpdate = false; // With always update set to true we get the I2C error.
+  if (newSleepMode != sleepMode || alwaysUpdate) {
+    sleepMode = newSleepMode;
+    set_sleep_mode(sleepMode);
+  }
+}
+
 void loop() {
   if (quickFlash) {
     statusLED.writeColor(255, 255, 255);
@@ -208,11 +224,15 @@ void loop() {
     //TODO Check that this won't power off the RP2040 when unwanted, might need more logic around the rp2040ReadyToPowerOff variable.
   }
 
+
+  updateSleepMode();
+  /*
   if (statusLED.isOn()) {
     set_sleep_mode(SLEEP_MODE_IDLE);
   } else {
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);
   }
+  */
 
   updateLEDs();
   //delay(50);
