@@ -15,5 +15,6 @@
 #define PI_SHUTDOWN     PIN_PC3   // Trigger Raspberry Pi to shutdown.
 #define EN_RP2040       PIN_PA1   // Drive low to power on rp2040.
 #define PI_COMMAND_PIN  PIN_PC0   // Drive low to get the Raspberry Pi to check what commands to run.
+#define I2C_SDA         PIN_PB1
 
 #endif

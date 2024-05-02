@@ -182,10 +182,34 @@ void updateSleepMode() {
   } else {
     newSleepMode = SLEEP_MODE_PWR_DOWN;
   }
-  bool alwaysUpdate = false; // With always update set to true we get the I2C error.
-  if (newSleepMode != sleepMode || alwaysUpdate) {
+  if (newSleepMode != sleepMode || false) {  // true for debug, trying to trigger I2C issue.
     sleepMode = newSleepMode;
+    noInterrupts();
+    sleep_disable();
     set_sleep_mode(sleepMode);
+    sleep_enable();
+    interrupts();
+  }
+}
+
+// The ATtiny gets into a state where it will hold the I2C SDA low. Not too sure on the reasons for this but this is a bit of a hack to recover from it. //TODO Find out why this happens.
+volatile uint8_t sdaLowCount = 0;
+
+void checkHoldingSDALow() {
+  if (digitalRead(I2C_SDA) == LOW) {
+    sdaLowCount++;
+  } else {
+    sdaLowCount = 0;
+  }
+  if (sdaLowCount > 32) { // Will check about 16 times a second when called in the main loop so will take 2 second to recover.
+    sdaLowCount = 0;
+    writeErrorFlag(ErrorCode::HOLDING_SDA_LOW, true);
+    noInterrupts();
+    Wire.end();
+    Wire.begin(I2C_ADDRESS);
+    Wire.onReceive(receiveEvent);
+    Wire.onRequest(requestEvent);
+    interrupts();
   }
 }
 
@@ -224,16 +248,9 @@ void loop() {
     //TODO Check that this won't power off the RP2040 when unwanted, might need more logic around the rp2040ReadyToPowerOff variable.
   }
 
+  checkHoldingSDALow();
 
   updateSleepMode();
-  /*
-  if (statusLED.isOn()) {
-    set_sleep_mode(SLEEP_MODE_IDLE);
-  } else {
-    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-  }
-  */
-
   updateLEDs();
   //delay(50);
   sleep_mode();

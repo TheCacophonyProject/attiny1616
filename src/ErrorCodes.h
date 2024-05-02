@@ -15,6 +15,7 @@ enum class ErrorCode {
   BAD_I2C_LENGTH_SMALL          = 0x0C,  // I2C data length was not 3 bytes.
   BAD_I2C_LENGTH_BIG            = 0x0D,  // I2C data length was not 3 bytes.
   BAD_I2C                       = 0x0E,
+  HOLDING_SDA_LOW               = 0x0F,
 };
 
 #endif
