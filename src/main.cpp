@@ -8,7 +8,7 @@
 #include <avr/io.h>
 
 #define MAJOR_VERSION 12 // Needs to be updated if the compatibility will change with tc2-agent, tc2-firmware, or tc2-hat-controller
-#define MINOR_VERSION 6  // Update for just small bug fixes that doesn't cause compatibility issues with other software.
+#define MINOR_VERSION 7  // Update for just small bug fixes that doesn't cause compatibility issues with other software.
 
 //=====DEFINITIONS=====//
 #define BATTERY_HYSTERESIS 10
