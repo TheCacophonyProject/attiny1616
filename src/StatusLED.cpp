@@ -9,15 +9,17 @@
 #define LED_OFF 0x000000
 
 void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnectionState, bool auxTerminalEnabled) {
-  if (newState != cameraState) {
-    ledOnTime = getPitTimeMillis();
-    cameraState = newState;
-    ledOn = true;
-  }
-  if (newConnectionState != connectionState) {
-    ledOnTime = getPitTimeMillis();
-    connectionState = newConnectionState;
-    ledOn = true;
+  if (ledOn) { // Only update if the LED is already on. This is so once the LED is off it will stay off.
+    if (newState != cameraState) {
+      ledChange = getPitTimeMillis();
+      cameraState = newState;
+      ledOn = true;
+    }
+    if (newConnectionState != connectionState) {
+      ledChange = getPitTimeMillis();
+      connectionState = newConnectionState;
+      ledOn = true;
+    }
   }
 
   if (flashing) {
@@ -34,7 +36,7 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
     }
     if (flashSequenceCount > flashLength) {
       flashDelay = LED_FLASH_OFF_DURATION_MS*4; // Wait four times longer between flash sequences.
-      writeColor(0, 0, 0);
+      writeColor(LED_OFF);
       flashSequenceCount = 0;
       ledFlashState = LOW;
 
@@ -45,7 +47,7 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
     return;
   }
 
-  if (getPitTimeMillis() - ledOnTime > LED_ON_DURATION_MS) {
+  if (getPitTimeMillis() - ledChange > LED_ON_DURATION_MS) {
     ledOn = false;
   }
 
@@ -56,10 +58,10 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
 
   switch (cameraState) {
     case CameraState::POWERING_ON:
-      writeColor(0, 0, increasingSawTooth(220, 1, ledOnTime, 2000));
+      writeColor(0, 0, increasingSawTooth(220, 1, ledChange, 2000));
       break;
     case CameraState::POWERING_OFF:
-      writeColor(decreasingSawTooth(220, 1, ledOnTime, 2000), 0, 0);
+      writeColor(decreasingSawTooth(220, 1, ledChange, 2000), 0, 0);
       break;
     case CameraState::POWERED_OFF:
       writeColor(RED);
@@ -93,10 +95,10 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
           writeColor(YELLOW);
           break;
         case CameraConnectionState::WIFI_SETUP:
-          writeColor(0, increasingSawTooth(220, 1, ledOnTime, 2000), 0);
+          writeColor(0, increasingSawTooth(220, 1, ledChange, 2000), 0);
           break;
         case CameraConnectionState::HOTSPOT_SETUP:
-          writeColor(increasingSawTooth(0xFF, 1, ledOnTime, 2000), increasingSawTooth(0x83, 1, ledOnTime, 2000), 0);
+          writeColor(increasingSawTooth(0xFF, 1, ledChange, 2000), increasingSawTooth(0x83, 1, ledChange, 2000), 0);
           break;
         default:
           error(ErrorCode::INVALID_CAMERA_STATE);
@@ -104,10 +106,10 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
       }
       break;
     case CameraState::REBOOTING:
-      if (getPitTimeMillis() - ledOnTime < 8000) {
-        writeColor(decreasingSawTooth(220, 1, ledOnTime, 2000), 0, 0);
+      if (getPitTimeMillis() - ledChange < 8000) {
+        writeColor(decreasingSawTooth(220, 1, ledChange, 2000), 0, 0);
       } else {
-        writeColor(0, 0, increasingSawTooth(220, 1, ledOnTime, 2000));
+        writeColor(0, 0, increasingSawTooth(220, 1, ledChange, 2000));
       }
       break;
     default:
@@ -168,7 +170,7 @@ bool StatusLED::isOn() {
 }
 
 void StatusLED::show() {
-  ledOnTime = getPitTimeMillis();
+  ledChange = getPitTimeMillis();
   ledOn = true;
 }
 

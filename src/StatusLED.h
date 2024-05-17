@@ -31,7 +31,7 @@ class StatusLED {
     private:
         CameraState cameraState;
         CameraConnectionState connectionState;
-        unsigned long ledOnTime = 0;
+        unsigned long ledChange = 0;
         unsigned long lastLEDFlashUpdateTime = 0;
         bool ledFlashState = LOW;
         uint8_t ledFlashCount = 0;
