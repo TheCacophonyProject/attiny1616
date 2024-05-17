@@ -250,8 +250,8 @@ void loop() {
 
   checkHoldingSDALow();
 
-  updateSleepMode();
   updateLEDs();
+  updateSleepMode();
   //delay(50);
   sleep_mode();
 }
