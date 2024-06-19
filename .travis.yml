@@ -1,6 +1,6 @@
 language: python
 python:
-    - "3.9"
+  - "3.9"
 
 # Cache PlatformIO packages using Travis CI container-based infrastructure
 sudo: false
@@ -16,12 +16,14 @@ install:
 
 script:
   - pio run
+  - sha256sum .pio/build/ATtiny1616/firmware.hex > .pio/build/ATtiny1616/firmware.hex.sha256
 
 deploy:
   provider: releases
   api_key: $GITHUB_TOKEN
   file:
     - ".pio/build/ATtiny1616/firmware.hex"
+    - ".pio/build/ATtiny1616/firmware.hex.sha256"
   skip_cleanup: true
   on:
     tags: true
