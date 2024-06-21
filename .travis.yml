@@ -29,6 +29,7 @@ before_script:
     fi
 
 script:
+  - pio --version
   - pio run
   - sha256sum .pio/build/ATtiny1616/firmware.hex > .pio/build/ATtiny1616/firmware.hex.sha256
 
