@@ -20,9 +20,9 @@ before_script:
       export MAJOR_VERSION=${BASH_REMATCH[1]}
       export MINOR_VERSION=${BASH_REMATCH[2]}
       export PATCH_VERSION=${BASH_REMATCH[3]}
-      echo "Setting MAJOR to $MAJOR"
-      echo "Setting MINOR to $MINOR"
-      echo "Setting PATCH to $PATCH"
+      echo "Setting MAJOR to $MAJOR_VERSION"
+      echo "Setting MINOR to $MINOR_VERSION"
+      echo "Setting PATCH to $PATCH_VERSION"
     else
       echo "Tag does not match version pattern"
       exit 1
