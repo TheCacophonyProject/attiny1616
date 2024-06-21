@@ -14,6 +14,20 @@ install:
   - pip install -U platformio
   - pio update
 
+before_script:
+  - |
+    if [[ $TRAVIS_TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+      export MAJOR=${BASH_REMATCH[1]}
+      export MINOR=${BASH_REMATCH[2]}
+      export PATCH=${BASH_REMATCH[3]}
+      echo "Setting MAJOR to $MAJOR"
+      echo "Setting MINOR to $MINOR"
+      echo "Setting PATCH to $PATCH"
+    else
+      echo "Tag does not match version pattern"
+      exit 1
+    fi
+
 script:
   - pio run
   - sha256sum .pio/build/ATtiny1616/firmware.hex > .pio/build/ATtiny1616/firmware.hex.sha256
