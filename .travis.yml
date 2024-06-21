@@ -17,9 +17,9 @@ install:
 before_script:
   - |
     if [[ $TRAVIS_TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-      export MAJOR=${BASH_REMATCH[1]}
-      export MINOR=${BASH_REMATCH[2]}
-      export PATCH=${BASH_REMATCH[3]}
+      export MAJOR_VERSION=${BASH_REMATCH[1]}
+      export MINOR_VERSION=${BASH_REMATCH[2]}
+      export PATCH_VERSION=${BASH_REMATCH[3]}
       echo "Setting MAJOR to $MAJOR"
       echo "Setting MINOR to $MINOR"
       echo "Setting PATCH to $PATCH"
