@@ -7,9 +7,6 @@
 #include <timer.h>
 #include <avr/io.h>
 
-#define MAJOR_VERSION 12 // Needs to be updated if the compatibility will change with tc2-agent, tc2-firmware, or tc2-hat-controller
-#define MINOR_VERSION 8  // Update for just small bug fixes that doesn't cause compatibility issues with other software.
-
 //=====DEFINITIONS=====//
 #define BATTERY_HYSTERESIS 10
 #define BUTTON_LONG_PRESS_DURATION 1200
@@ -30,6 +27,7 @@
 #define REG_MINOR_VERSION        0x08
 #define REG_FLASH_ERRORS         0x09
 #define REG_CLEAR_ERRORS         0x0A
+#define REG_PATCH_VERSION        0x0B
 
 #define REG_BATTERY_CHECK_CTRL 0x10 //CTRL
 #define REG_BATTERY_LOW_VAL1   0x11 //LOW 1
@@ -144,6 +142,7 @@ void setup() {
   }
   writeMasks[REG_MAJOR_VERSION] = 0x00;
   writeMasks[REG_MINOR_VERSION] = 0x00;
+  writeMasks[REG_PATCH_VERSION] = 0x00;
   writeMasks[REG_TYPE] = 0x00;
   writeMasks[REG_BATTERY_CHECK_CTRL] = 0x03; // Only allow writing to bits to turn on or off battery check.
   writeMasks[REG_BATTERY_LV_DIV_VAL1] = 0x01 << 7;
@@ -155,8 +154,10 @@ void setup() {
 
   // Write I2C initial register values.
   registers[REG_TYPE] = 0xCA;
-  registers[REG_MAJOR_VERSION] = MAJOR_VERSION;
-  registers[REG_MINOR_VERSION] = MINOR_VERSION;
+  // When running `pio run` MAJOR, MINOR, and PATCH are set using environment variables.
+  registers[REG_MAJOR_VERSION] = MAJOR_VERSION; // If getting error set environment variable with `export MAJOR_VERSION=0`
+  registers[REG_MINOR_VERSION] = MINOR_VERSION; // If getting error set environment variable with `export MINOR_VERSION=0`
+  registers[REG_PATCH_VERSION] = PATCH_VERSION; // If getting error set environment variable with `export PATCH_VERSION=0`
 
   // Setup I2C
   Wire.begin(I2C_ADDRESS);
@@ -761,14 +762,17 @@ void processButtonPress() {
   if (buttonPressDuration < 5) {
     buttonPressDuration = 0;
     return;
-  } else if (buttonPressDuration < BUTTON_LONG_PRESS_DURATION) {
-    if (!statusLED.isOn()) {
+  }
+  if (buttonPressDuration < BUTTON_LONG_PRESS_DURATION) {
+    // Button short press
+    if (statusLED.isOn()) {
+      statusLED.off();
+    } else {
       statusLED.show();
-    } else if (cameraState == CameraState::POWERED_ON) {
-      requestPiCommand(ENABLE_WIFI_FLAG);
     }
     updateLEDs();
   } else {
+    // Button long press
     if (cameraState == CameraState::POWERED_OFF) {
       powerOnRPi();
       registers[REG_RP2040_PI_POWER_CTRL] = 0;
@@ -778,6 +782,7 @@ void processButtonPress() {
       delay(200);
       registers[REG_RP2040_PI_POWER_CTRL] = 0x02;
     }
+    statusLED.show();
   }
   if (quickButtonPressCount > 10) {
     quickButtonPressCount = 0;
