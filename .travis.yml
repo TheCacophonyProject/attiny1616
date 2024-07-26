@@ -15,7 +15,6 @@ install:
   - pio pkg update
 
 before_script:
-  - echo "TRAVIS_TAG : '$TRAVIS_TAG'"
   - |
     if [[ $TRAVIS_TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
       export MAJOR_VERSION=${BASH_REMATCH[1]}
