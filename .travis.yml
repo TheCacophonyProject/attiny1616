@@ -12,26 +12,33 @@ cache:
 install:
   - pip install urllib3==1.26.15
   - pip install -U platformio
-  - pio update
+  - pio pkg update
 
 before_script:
   - |
-    if [[ $TRAVIS_TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-      export MAJOR_VERSION=${BASH_REMATCH[1]}
-      export MINOR_VERSION=${BASH_REMATCH[2]}
-      export PATCH_VERSION=${BASH_REMATCH[3]}
-      echo "Setting MAJOR to $MAJOR_VERSION"
-      echo "Setting MINOR to $MINOR_VERSION"
-      echo "Setting PATCH to $PATCH_VERSION"
+    if [[ -n "$TRAVIS_TAG" ]]; then
+      if [[ $TRAVIS_TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+        export MAJOR_VERSION=${BASH_REMATCH[1]}
+        export MINOR_VERSION=${BASH_REMATCH[2]}
+        export PATCH_VERSION=${BASH_REMATCH[3]}
+        echo "Setting MAJOR to $MAJOR_VERSION"
+        echo "Setting MINOR to $MINOR_VERSION"
+        echo "Setting PATCH to $PATCH_VERSION"
+      else
+        echo "Tag does not match version pattern"
+        exit 1
+      fi
     else
-      echo "Tag does not match version pattern"
-      exit 1
+      export MAJOR_VERSION=0
+      export MINOR_VERSION=0
+      export PATCH_VERSION=0
+      echo "No tag defined. Setting default version values to 0.0.0"
     fi
 
 script:
   - pio --version
   - pio run
-  - sha256sum .pio/build/ATtiny1616/firmware.hex | cut -d ' ' -f 1 > .pio/build/ATtiny1616/firmware.hex.sha256 |
+  - sha256sum .pio/build/ATtiny1616/firmware.hex | cut -d ' ' -f 1 > .pio/build/ATtiny1616/firmware.hex.sha256
 
 deploy:
   provider: releases
