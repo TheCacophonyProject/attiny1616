@@ -15,7 +15,7 @@ install:
   - pio pkg update
 
 before_script:
-  - echo "TRAVIS_TAG: '$TRAVIS_TAG'"
+  - echo "TRAVIS_TAG : '$TRAVIS_TAG'"
   - |
     if [[ $TRAVIS_TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
       export MAJOR_VERSION=${BASH_REMATCH[1]}
@@ -24,8 +24,11 @@ before_script:
       echo "Setting MAJOR to $MAJOR_VERSION"
       echo "Setting MINOR to $MINOR_VERSION"
       echo "Setting PATCH to $PATCH_VERSION"
-
-    else
+    else if [[ $TRAVIS_TAG == "" ]]; then
+      export MAJOR_VERSION=0
+      export MINOR_VERSION=0
+      export PATCH_VERSION=0
+    elif
       echo "Tag does not match version pattern"
       exit 1
     fi
