@@ -31,7 +31,7 @@ before_script:
 script:
   - pio --version
   - pio run
-  - sha256sum .pio/build/ATtiny1616/firmware.hex | cut -d ' ' -f 1 > .pio/build/ATtiny1616/firmware.hex.sha256 |
+  - sha256sum .pio/build/ATtiny1616/firmware.hex | cut -d ' ' -f 1 > .pio/build/ATtiny1616/firmware.hex.sha256
 
 deploy:
   provider: releases
