@@ -784,7 +784,7 @@ void processButtonPress() {
     }
     statusLED.show();
   }
-  if (quickButtonPressCount > 10) {
+  if (quickButtonPressCount > 20) {
     quickButtonPressCount = 0;
     statusLED.writeColor(0xFFFFFF);
     delay(2000);
