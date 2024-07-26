@@ -12,7 +12,7 @@ cache:
 install:
   - pip install urllib3==1.26.15
   - pip install -U platformio
-  - pio update
+  - pio pkg update
 
 before_script:
   - |
