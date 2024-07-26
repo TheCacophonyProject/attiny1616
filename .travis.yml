@@ -16,20 +16,23 @@ install:
 
 before_script:
   - |
-    if [[ $TRAVIS_TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-      export MAJOR_VERSION=${BASH_REMATCH[1]}
-      export MINOR_VERSION=${BASH_REMATCH[2]}
-      export PATCH_VERSION=${BASH_REMATCH[3]}
-      echo "Setting MAJOR to $MAJOR_VERSION"
-      echo "Setting MINOR to $MINOR_VERSION"
-      echo "Setting PATCH to $PATCH_VERSION"
-    else if [[ $TRAVIS_TAG == "" ]]; then
+    if [[ -n "$TRAVIS_TAG" ]]; then
+      if [[ $TRAVIS_TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+        export MAJOR_VERSION=${BASH_REMATCH[1]}
+        export MINOR_VERSION=${BASH_REMATCH[2]}
+        export PATCH_VERSION=${BASH_REMATCH[3]}
+        echo "Setting MAJOR to $MAJOR_VERSION"
+        echo "Setting MINOR to $MINOR_VERSION"
+        echo "Setting PATCH to $PATCH_VERSION"
+      else
+        echo "Tag does not match version pattern"
+        exit 1
+      fi
+    else
       export MAJOR_VERSION=0
       export MINOR_VERSION=0
       export PATCH_VERSION=0
-    elif
-      echo "Tag does not match version pattern"
-      exit 1
+      echo "No tag defined. Setting default version values to 0.0.0"
     fi
 
 script:
