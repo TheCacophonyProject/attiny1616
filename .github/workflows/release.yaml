@@ -53,7 +53,7 @@ jobs:
           fi
 
       - name: Set default version if no tag
-        if: github.ref != 'refs/tags/*'
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: |
           echo "MAJOR_VERSION=0" >> $GITHUB_ENV
           echo "MINOR_VERSION=0" >> $GITHUB_ENV
