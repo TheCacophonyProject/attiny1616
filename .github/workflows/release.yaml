@@ -75,8 +75,4 @@ jobs:
           artifacts: |
             .pio/build/ATtiny1616/firmware.hex
             .pio/build/ATtiny1616/firmware.hex.sha256
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
+          allowUpdates: true
