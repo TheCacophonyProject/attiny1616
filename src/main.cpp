@@ -355,6 +355,9 @@ void checkBatteryLowVoltageDivider() {
 }
 
 void checkBatteryRTC() {
+  // Make a reading first, this is because the RTC battery first reading is often bad.
+  analogRead(RTC_BAT_SENSE);
+  delayMicroseconds(200);
   battRTC = sampleBattery(RTC_BAT_SENSE);
 }
 
