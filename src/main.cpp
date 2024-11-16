@@ -106,6 +106,8 @@ StatusLED statusLED;
 volatile bool quickFlash = false;
 
 void setup() {
+  wdt_disable();
+
   PORTMUX_CTRLC |= PORTMUX_TCA00_bm;
   // Initialize Pins
   pinMode(LED_R, OUTPUT);
@@ -172,6 +174,23 @@ void setup() {
   // set_sleep_mode(SLEEP_MODE_PWR_DOWN); // PWM LED signals don't work in this power mode. //TODO Use this power mode when LEDs are solid or not on.
   sleep_enable();
   powerOnRPi();
+
+  /*
+  // Checking for the reason for booting doesn't seam to work.
+  if (RSTCTRL.RSTFR & RSTCTRL_WDRF_bm) {
+    RSTCTRL.RSTFR = RSTCTRL_WDRF_bm; // Clear the watchdog reset flag
+    writeErrorFlag(ErrorCode::WDT_TRIGGERED, true);
+    delay(10000);
+  }
+
+  if (RSTCTRL.RSTFR & RSTCTRL_BORF_bm) {
+    RSTCTRL.RSTFR = RSTCTRL_BORF_bm; // Clear the brown out reset flag
+    writeErrorFlag(ErrorCode::BOR_TRIGGERED, true);
+    delay(10000);
+  }
+  */
+  wdt_reset();
+  wdt_enable(WDTO_2S);
 }
 
 volatile uint8_t sleepMode = SLEEP_MODE_IDLE;
@@ -215,6 +234,7 @@ void checkHoldingSDALow() {
 }
 
 void loop() {
+  wdt_reset();
   if (quickFlash) {
     statusLED.writeColor(255, 255, 255);
     delay(100);
@@ -745,6 +765,7 @@ void buttonWakeUp() {
       statusLED.writeColor(0xFFFFFF);
     }
     delay(1);
+    wdt_reset();
     buttonPressDuration++;
   }
   if (buttonPressDuration > 5) {
@@ -787,8 +808,13 @@ void processButtonPress() {
   if (quickButtonPressCount > 20) {
     quickButtonPressCount = 0;
     statusLED.writeColor(0xFFFFFF);
-    delay(2000);
+    wdt_disable();
+    delay(3000);
     requestPiCommand(TOGGLE_AUX_TERMINAL_FLAG);
+    while (true) {
+      CCP = 0xD8;
+      RSTCTRL.SWRR |= RSTCTRL_SWRE_bm;  // Writing this bit will reset the ATtiny1616
+    }
   }
   buttonPressDuration = 0;
 }
