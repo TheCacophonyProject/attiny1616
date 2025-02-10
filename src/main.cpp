@@ -86,7 +86,7 @@ volatile unsigned long poweringOffTime = 0;
 // Timer to check that the ATtiny is woken up by the RTC_ALARM interrupt after at least 24 hours. 
 // If reaches MAX_POWERED_OFF_DURATION_MS then the camera is reset and a SLEEP_ error flag is set in the I2C register
 volatile unsigned long poweredOffTime = 0; 
-#define MAX_POWERED_OFF_DURATION_MS 86400000
+#define MAX_POWERED_OFF_DURATION_MS 129'600'000 // 36 hours
 
 // Time from getPitTimeMillis() of when the ATtiny requested communications from the Raspberry Pi.
 // If the Raspberry Pi is not hear from after PI_COMMAND_TIMEOUT a error flag will be set in the I2C register.
