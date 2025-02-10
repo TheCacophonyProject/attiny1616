@@ -50,6 +50,8 @@
 #define POWER_OFF_RPI            0x01 << 3
 #define TOGGLE_AUX_TERMINAL_FLAG 0x01 << 4
 
+#define WDT_DURATION WDTO_2S
+
 uint8_t writeMasks[REG_LEN] = {}; // Should all be initialised to 0xFF
 
 //=====GLOBAL VARIABLES=====//
@@ -190,7 +192,7 @@ void setup() {
   }
   */
   wdt_reset();
-  wdt_enable(WDTO_2S);
+  wdt_enable(WDT_DURATION);
 }
 
 volatile uint8_t sleepMode = SLEEP_MODE_IDLE;
@@ -814,10 +816,12 @@ void processButtonPress() {
     wdt_disable();
     delay(3000);
     requestPiCommand(TOGGLE_AUX_TERMINAL_FLAG);
-    while (true) {
-      CCP = 0xD8;
-      RSTCTRL.SWRR |= RSTCTRL_SWRE_bm;  // Writing this bit will reset the ATtiny1616
-    }
+    wdt_reset();
+    wdt_enable(WDT_DURATION);
+    //while (true) {
+    //  CCP = 0xD8;
+    //  RSTCTRL.SWRR |= RSTCTRL_SWRE_bm;  // Writing this bit will reset the ATtiny1616
+    //}
   }
   buttonPressDuration = 0;
 }
