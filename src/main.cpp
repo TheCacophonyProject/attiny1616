@@ -28,6 +28,8 @@
 #define REG_FLASH_ERRORS         0x09
 #define REG_CLEAR_ERRORS         0x0A
 #define REG_PATCH_VERSION        0x0B
+#define REG_BOOT_DURATION_1      0x0C
+#define REG_BOOT_DURATION_2      0x0D
 
 #define REG_BATTERY_CHECK_CTRL 0x10 //CTRL
 #define REG_BATTERY_LOW_VAL1   0x11 //LOW 1
@@ -71,6 +73,8 @@ volatile bool rp2040ReadyToPowerOff = false;  // Need to wait for RPi to power o
 // After 30 minutes the camera is reset and a MAX_POWERING_ON_DURATION_MS error flag is set in the I2C register.
 volatile unsigned long poweringOnTime = 0;
 #define MAX_POWERING_ON_DURATION_MS 300000
+// This will note how long it took the camera to power on.
+volatile unsigned long bootDuration = 0;
 
 // Time from getPitTimeMillis() of the last time the ATtiny was communicated with the RPi.
 // If it has not been communicated for over PI_COMMS_INTERVAL it will request comms from the RPi.
@@ -155,6 +159,8 @@ void setup() {
   writeMasks[REG_BATTERY_HV_DIV_VAL2] = 0x00;
   writeMasks[REG_BATTERY_RTC_VAL1] = 0x01 << 7;
   writeMasks[REG_BATTERY_RTC_VAL2] = 0x00;
+  writeMasks[REG_BOOT_DURATION_1] = 0x00;
+  writeMasks[REG_BOOT_DURATION_2] = 0x00;
 
   // Write I2C initial register values.
   registers[REG_TYPE] = 0xCA;
@@ -198,18 +204,23 @@ void setup() {
 volatile uint8_t sleepMode = SLEEP_MODE_IDLE;
 
 void updateSleepMode() {
-  uint8_t newSleepMode;
-  if (statusLED.isOn()) {
-    newSleepMode = SLEEP_MODE_IDLE;
-  } else {
-    newSleepMode = SLEEP_MODE_PWR_DOWN;
-  }
-  if (newSleepMode != sleepMode || false) {  // true for debug, trying to trigger I2C issue.
-    sleepMode = newSleepMode;
+  uint8_t newSleepMode = statusLED.isOn() ? SLEEP_MODE_IDLE : SLEEP_MODE_PWR_DOWN;
+
+  if (newSleepMode != sleepMode) {
     noInterrupts();
+
+    // Check if the I2C is currently active
+    if (TWI0.SSTATUS & (TWI_APIF_bm | TWI_DIF_bm)) {
+      interrupts();
+      return;
+    }
+
+    sleepMode = newSleepMode;
+
     sleep_disable();
     set_sleep_mode(sleepMode);
     sleep_enable();
+
     interrupts();
   }
 }
@@ -414,6 +425,13 @@ void checkCameraState() {
     writeCameraState(static_cast<CameraState>(registers[REG_CAMERA_STATE]));
   } else {
     writeErrorFlag(ErrorCode::INVALID_CAMERA_STATE);
+  }
+
+  // Check if the camera has just finished booting. If so set the boot duration.
+  if (cameraState == CameraState::POWERED_ON && registers[REG_BOOT_DURATION_1] == 0 && registers[REG_BOOT_DURATION_2] == 0) {
+    uint16_t powerOnDurationSeconds = (getPitTimeMillis() - poweringOnTime)/1000;
+    registers[REG_BOOT_DURATION_1] = powerOnDurationSeconds >> 8;
+    registers[REG_BOOT_DURATION_2] = powerOnDurationSeconds & 0xFF;
   }
 
   // Check if the camera has had a power on timeout.
@@ -730,6 +748,8 @@ void powerRPiOffNow() {
   registers[REG_TC2_AGENT_READY] = 0;
   registers[REG_PI_COMMANDS] = 0;
   registers[REG_CAMERA_CONNECTION] = 0;
+  registers[REG_BOOT_DURATION_1] = 0;
+  registers[REG_BOOT_DURATION_2] = 0;
 }
 
 void requestRPiPowerOff() {
