@@ -682,7 +682,7 @@ void receiveEvent(int howMany) {
   }
 
   // WDT for RP2040
-  if (address == REG_RP2040_PI_POWER_CTRL) {
+  if (address == REG_WDT_RP2040) {
     rp2040WdtResetTime = getPitTimeMillis();
   }
 
@@ -781,6 +781,7 @@ void powerOnRP2040(bool wdtRebootCheck) {
   rp2040ReadyToPowerOff = false;
   checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
   digitalWrite(EN_RP2040, LOW);
+  rp2040State = RP2040State::POWERED_ON;
 }
 
 void powerOffRP2040() {
