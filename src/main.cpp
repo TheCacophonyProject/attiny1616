@@ -192,6 +192,7 @@ void setup() {
   // set_sleep_mode(SLEEP_MODE_PWR_DOWN); // PWM LED signals don't work in this power mode. //TODO Use this power mode when LEDs are solid or not on.
   sleep_enable();
   powerOnRPi();
+  powerOnRP2040();
 
   /*
   // Checking for the reason for booting doesn't seam to work.
