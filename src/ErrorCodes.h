@@ -15,9 +15,10 @@ enum class ErrorCode {
   BAD_I2C_LENGTH_SMALL          = 0x0C,  // I2C data length was not 3 bytes.
   BAD_I2C_LENGTH_BIG            = 0x0D,  // I2C data length was not 3 bytes.
   BAD_I2C                       = 0x0E,
-  HOLDING_SDA_LOW               = 0x0F,
-  WDT_TRIGGERED                 = 0x10,
-  BOR_TRIGGERED                 = 0x11,
+  HOLDING_SDA_LOW               = 0x0F,  // ATtiny sometimes can get in a state where it holds the SDA low.
+  WDT_TRIGGERED                 = 0x10,  // ATtiny WDT was triggered.
+  BOR_TRIGGERED                 = 0x11,  // ATtiny brown out was triggered.
+  RP2040_WDT_TIMEOUT            = 0x12   // RP2040 WDT was triggered.
 };
 
 #endif

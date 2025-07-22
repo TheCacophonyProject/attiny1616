@@ -20,7 +20,7 @@
 class StatusLED {
     public:
         void error(ErrorCode);
-        void updateLEDs(CameraState, CameraConnectionState, bool);
+        void updateLEDs(RPiState, CameraConnectionState, bool);
         void show();
         void writeColor(uint32_t color);
         void writeColor(uint8_t r, uint8_t g, uint8_t b);
@@ -29,7 +29,7 @@ class StatusLED {
         bool isOn();
         void off();
     private:
-        CameraState cameraState;
+        RPiState cameraState;
         CameraConnectionState connectionState;
         unsigned long ledChange = 0;
         unsigned long lastLEDFlashUpdateTime = 0;

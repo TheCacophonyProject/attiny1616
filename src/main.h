@@ -14,7 +14,7 @@ void rtcBatteryRegUpdate();
 void checkRegSleep();
 void checkCameraState();
 void checkRTCBattery();
-void writeCameraState(CameraState);
+void writeCameraState(RPiState);
 void receiveEvent(int);
 void requestEvent();
 void error(ErrorCode);
@@ -32,12 +32,13 @@ void writeErrorFlag(ErrorCode, bool);
 void requestPiCommand(uint8_t);
 void checkPiCommands();
 void checkPiCommsCountdown();
-void powerOnRP2040();
+void powerOnRP2040(bool ignoreRebootCheck = false);
 void powerOffRP2040();
 void regBatteryRTCUpdate();
 void regBatteryHVDivUpdate();
 void regBatteryLVDivUpdate();
 void checkForLowBattery();
 void checkRegRP2040PiPowerCtrl();
+void checkRP2040State();
 
 #endif // MAIN_H

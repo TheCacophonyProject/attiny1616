@@ -30,6 +30,7 @@
 #define REG_PATCH_VERSION        0x0B
 #define REG_BOOT_DURATION_1      0x0C
 #define REG_BOOT_DURATION_2      0x0D
+#define REG_WDT_RP2040           0x0E
 
 #define REG_BATTERY_CHECK_CTRL 0x10 //CTRL
 #define REG_BATTERY_LOW_VAL1   0x11 //LOW 1
@@ -82,6 +83,15 @@ volatile unsigned long lastPiCommsTime = 0;
 //#define WDT_RESET_INTERVAL 30000
 #define PI_COMMS_INTERVAL 100000
 
+// WDT timer for RP2040 (15 minutes)
+volatile unsigned long rp2040WdtResetTime = 0;
+#define RP2040_WDT_RESET_INTERVAL 900000
+
+// Time from getPitTimeMillis() of when the RP2040 was turned off for a reset
+// After a set amount of time (RP2040_POWER_OFF_RESET_DURATION) the RP2040 should be powered back on.
+volatile unsigned long rp2040PoweringOffResetTime = 0;
+#define RP2040_POWER_OFF_RESET_DURATION 5000
+
 // Time from getPitTimeMillis() of when the camera asked to be turned off.
 // After a set about of time in ms the camera is defined from POWER_OFF_DELAY_MS it will then power off the camera.
 volatile unsigned long poweringOffTime = 0;
@@ -106,10 +116,10 @@ volatile uint8_t quickButtonPressCount = 0;
 
 volatile unsigned long poweredOnTime = 0;
 
-volatile CameraState cameraState = CameraState::POWERING_ON;
+volatile RPiState cameraState = RPiState::POWERING_ON;
 StatusLED statusLED;
 
-volatile bool quickFlash = false;
+volatile bool quickFlash = false; // A debugging tool to quickly flash the LED.
 
 void setup() {
   wdt_disable();
@@ -274,9 +284,10 @@ void loop() {
   checkCameraState();
   checkPiCommands();
   checkPiCommsCountdown();
+  checkRP2040State();
 
   // Only power off the RP2040 when the RPi has been power off first.
-  if (rp2040ReadyToPowerOff && registers[REG_CAMERA_STATE] == uint8_t(CameraState::POWERED_OFF)) {
+  if (rp2040ReadyToPowerOff && registers[REG_CAMERA_STATE] == uint8_t(RPiState::POWERED_OFF)) {
     powerOffRP2040();
     rp2040ReadyToPowerOff = false;
     //TODO Check that this won't power off the RP2040 when unwanted, might need more logic around the rp2040ReadyToPowerOff variable.
@@ -310,7 +321,7 @@ void writeErrorFlag(ErrorCode errorCode, bool flash = true) {
 }
 
 void checkPiCommsCountdown() {
-  if (cameraState != CameraState::POWERED_ON) {
+  if (cameraState != RPiState::POWERED_ON) {
     return;
   }
   if (getPitTimeMillis() - lastPiCommsTime > PI_COMMS_INTERVAL) {
@@ -322,14 +333,15 @@ void checkPiCommands() {
   // Check if the Raspberry Pi is responding to command requests
   if (registers[REG_PI_COMMANDS] != 0  &&
       getPitTimeMillis() - piCommandRequestTime > PI_COMMAND_TIMEOUT &&
-      cameraState == CameraState::POWERED_ON &&
+      cameraState == RPiState::POWERED_ON &&
       getPitTimeMillis() - poweredOnTime > PI_COMMAND_TIMEOUT) {
     writeErrorFlag(ErrorCode::PI_COMMAND_TIMEDOUT);
     registers[REG_PI_COMMANDS] = 0;
+    // TODO, should we be restarting the Raspberry Pi here?
   }
 
-  // Drive PI_COMMAND_PIN low to get Raspberry Pi to check what commands to run
-  if (registers[REG_PI_COMMANDS] == 0 && cameraState == CameraState::POWERED_ON) {
+  // Drive PI_COMMAND_PIN low if there is a command the RPi should be checking.
+  if (registers[REG_PI_COMMANDS] == 0 && cameraState == RPiState::POWERED_ON) {
     digitalWrite(PI_COMMAND_PIN, HIGH);
   } else {
     digitalWrite(PI_COMMAND_PIN, LOW);
@@ -421,21 +433,21 @@ void checkForLowBattery() {
 
 void checkCameraState() {
   // Update camera state from register if valid.
-  if (registers[REG_CAMERA_STATE] <= static_cast<uint8_t>(CameraState::REBOOTING)) {
-    writeCameraState(static_cast<CameraState>(registers[REG_CAMERA_STATE]));
+  if (registers[REG_CAMERA_STATE] <= static_cast<uint8_t>(RPiState::REBOOTING)) {
+    writeCameraState(static_cast<RPiState>(registers[REG_CAMERA_STATE]));
   } else {
     writeErrorFlag(ErrorCode::INVALID_CAMERA_STATE);
   }
 
   // Check if the camera has just finished booting. If so set the boot duration.
-  if (cameraState == CameraState::POWERED_ON && registers[REG_BOOT_DURATION_1] == 0 && registers[REG_BOOT_DURATION_2] == 0) {
+  if (cameraState == RPiState::POWERED_ON && registers[REG_BOOT_DURATION_1] == 0 && registers[REG_BOOT_DURATION_2] == 0) {
     uint16_t powerOnDurationSeconds = (getPitTimeMillis() - poweringOnTime)/1000;
     registers[REG_BOOT_DURATION_1] = powerOnDurationSeconds >> 8;
     registers[REG_BOOT_DURATION_2] = powerOnDurationSeconds & 0xFF;
   }
 
   // Check if the camera has had a power on timeout.
-  if (cameraState == CameraState::POWERING_ON && getPitTimeMillis() - poweringOnTime > MAX_POWERING_ON_DURATION_MS) {
+  if (cameraState == RPiState::POWERING_ON && getPitTimeMillis() - poweringOnTime > MAX_POWERING_ON_DURATION_MS) {
     powerRPiOffNow();
     delay(1000);
     powerOnRPi();
@@ -445,7 +457,7 @@ void checkCameraState() {
   }
 
   // Check if the camera has powered off.
-  if (cameraState == CameraState::POWERING_OFF) {
+  if (cameraState == RPiState::POWERING_OFF) {
     // gpio-poweroff in config.txt for the RPi will drive a pin low when it powers off.
     // TODO Check if you need to wait here for a second or two for the flash to finish writing.
     if (digitalRead(PI_POWERED_OFF) == LOW) {
@@ -454,7 +466,7 @@ void checkCameraState() {
     }
   }
 
-  if ((cameraState == CameraState::POWERED_ON || cameraState == CameraState::REBOOTING) && digitalRead(PI_POWERED_OFF) == LOW) {
+  if ((cameraState == RPiState::POWERED_ON || cameraState == RPiState::REBOOTING) && digitalRead(PI_POWERED_OFF) == LOW) {
     powerRPiOffNow();
     delay(1000);
     powerOnRPi();
@@ -464,36 +476,36 @@ void checkCameraState() {
 
   // TODO replace this with a shutdown timeout, as power off will be triggered from the PI_POWERED_OFF pin.
   // Check if the camera has had enough time to power off.
-  if (cameraState == CameraState::POWERING_OFF && getPitTimeMillis() - poweringOffTime > POWER_OFF_DELAY_MS) {
+  if (cameraState == RPiState::POWERING_OFF && getPitTimeMillis() - poweringOffTime > POWER_OFF_DELAY_MS) {
     powerRPiOffNow();
     return;
   }
 
   // Check if the device has been in sleep for too long.
-  if (cameraState == CameraState::POWERED_OFF && getPitTimeMillis() - poweredOffTime > MAX_POWERED_OFF_DURATION_MS) {
+  if (cameraState == RPiState::POWERED_OFF && getPitTimeMillis() - poweredOffTime > MAX_POWERED_OFF_DURATION_MS) {
     writeErrorFlag(ErrorCode::RTC_TIMEOUT);
     powerOnRPi();
     return;
   }
 }
 
-void writeCameraState(CameraState newCameraState) {
+void writeCameraState(RPiState newCameraState) {
   if (newCameraState != cameraState) {
     // This is to skip setting the state to POWERED_ON on when the camera is powering off.
     // In the time that the camera takes to power off the tc2-hat-attiny service might set the state to POWERED_ON
     // because it doesn't know the camera is powering off.
-    if (cameraState  == CameraState::POWERING_OFF &&
-      newCameraState == CameraState::POWERED_ON &&
+    if (cameraState  == RPiState::POWERING_OFF &&
+      newCameraState == RPiState::POWERED_ON &&
       poweringOffTime - getPitTimeMillis() > 10000) {
       return;
     }
 
     cameraState = newCameraState;
     updateLEDs();
-    if (cameraState == CameraState::POWERED_ON) {
+    if (cameraState == RPiState::POWERED_ON) {
       poweredOnTime = getPitTimeMillis();
     }
-    if (cameraState == CameraState::POWERING_OFF) {
+    if (cameraState == RPiState::POWERING_OFF) {
       poweringOffTime = getPitTimeMillis();
     }
   }
@@ -533,14 +545,14 @@ void checkRegRP2040PiPowerCtrl() {
   if (isBitSet(registers[REG_RP2040_PI_POWER_CTRL], 0)) {
     // RP2040 requires the RPi to be powered on. (RPi will read this so it knows to stay on, //TODO)
     // If RPi is off, then power it on.
-    if (cameraState == CameraState::POWERED_OFF) {
+    if (cameraState == RPiState::POWERED_OFF) {
       powerOnRPi();
     }
   } // If this bit is not set it is up to the RPi to decide when to power itself off.
 
   if (isBitSet(registers[REG_RP2040_PI_POWER_CTRL], 1)) {
     // Keep RP2040 on while RPi is powered on
-    if (cameraState == CameraState::POWERED_ON) {
+    if (cameraState == RPiState::POWERED_ON) {
       powerOnRP2040();
     } else {
       powerOffRP2040();
@@ -662,8 +674,15 @@ void receiveEvent(int howMany) {
       return;
     }
   }
+  
+  // WDT for RPi
   if (address == REG_CAMERA_STATE) {
     lastPiCommsTime = getPitTimeMillis();
+  }
+
+  // WDT for RP2040
+  if (address == REG_RP2040_PI_POWER_CTRL) {
+    rp2040WdtResetTime = getPitTimeMillis();
   }
 
   registerAddress = address;
@@ -715,20 +734,60 @@ void requestEvent() {
 // Function attached to the pin connected to the alarm pin on the RTC.
 void rtcWakeUp() {
   registers[REG_RP2040_PI_POWER_CTRL] = 0;
-  if (cameraState == CameraState::POWERED_OFF) {
+  if (cameraState == RPiState::POWERED_OFF) {
     checkForLowBattery();
     powerOnRP2040();
   }
 }
 
 //======================= RP2040 FUNCTIONS ============================//
-void powerOnRP2040() {
+
+RP2040State rp2040State = RP2040State::POWERED_OFF;
+
+void checkRP2040State() {
+  switch (rp2040State) {
+    case RP2040State::POWERED_OFF:
+      break;
+    case RP2040State::POWERED_ON:
+      // Check if the WDT has triggered.
+      if (getPitTimeMillis() - rp2040WdtResetTime > RP2040_WDT_RESET_INTERVAL) {
+        powerOffRP2040();
+        rp2040State = RP2040State::WDT_REBOOT;
+        rp2040WdtResetTime = getPitTimeMillis();
+        // Write an error.
+        writeErrorFlag(ErrorCode::RP2040_WDT_TIMEOUT);
+      }
+      break;
+    case RP2040State::WDT_REBOOT:
+      // Check if enough time has passed to turn the RP2040 back on.  
+      if (getPitTimeMillis() - rp2040WdtResetTime > RP2040_POWER_OFF_RESET_DURATION) {
+        powerOnRP2040(false);
+      }
+      break;
+  }
+}
+
+void powerOnRP2040(bool wdtRebootCheck) {
+  if (wdtRebootCheck && rp2040State == RP2040State::WDT_REBOOT) {
+    // In the process of rebooting from a WDT failure, don't turn the RP2040 back on.
+    return;
+  }
+  if (rp2040State == RP2040State::POWERED_ON) {
+    // Already powered on, don't need to do anything.
+    return;
+  }
+  rp2040WdtResetTime = getPitTimeMillis();  // Reset the WDT for the RP2040.
   rp2040ReadyToPowerOff = false;
   checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
   digitalWrite(EN_RP2040, LOW);
 }
 
 void powerOffRP2040() {
+  if (rp2040State == RP2040State::POWERED_OFF) {
+    // Already powered off, don't need to do anything.
+    return;
+  }
+  rp2040State = RP2040State::POWERED_OFF;
   digitalWrite(EN_RP2040, HIGH);
 }
 
@@ -737,14 +796,14 @@ void powerOnRPi() {
   checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
   digitalWrite(EN_5V, HIGH);
   powerOnRP2040();
-  writeCameraState(CameraState::POWERING_ON);
+  writeCameraState(RPiState::POWERING_ON);
   poweringOnTime = getPitTimeMillis();
 }
 
 void powerRPiOffNow() {
   poweredOffTime = getPitTimeMillis();  //TODO Tets this
   digitalWrite(EN_5V, LOW);
-  writeCameraState(CameraState::POWERED_OFF);
+  writeCameraState(RPiState::POWERED_OFF);
   registers[REG_TC2_AGENT_READY] = 0;
   registers[REG_PI_COMMANDS] = 0;
   registers[REG_CAMERA_CONNECTION] = 0;
@@ -754,7 +813,7 @@ void powerRPiOffNow() {
 
 void requestRPiPowerOff() {
   digitalWrite(PI_SHUTDOWN, LOW);
-  writeCameraState(CameraState::POWERING_OFF);
+  writeCameraState(RPiState::POWERING_OFF);
   registers[REG_TC2_AGENT_READY] = 0;
   poweringOffTime = getPitTimeMillis();
   delay(100);
@@ -819,7 +878,7 @@ void processButtonPress() {
     updateLEDs();
   } else {
     // Button long press
-    if (cameraState == CameraState::POWERED_OFF) {
+    if (cameraState == RPiState::POWERED_OFF) {
       powerOnRPi();
       registers[REG_RP2040_PI_POWER_CTRL] = 0;
     } else {

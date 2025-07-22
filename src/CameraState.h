@@ -1,7 +1,7 @@
 #ifndef CAMERA_STATE_H
 #define CAMERA_STATE_H
 
-enum class CameraState {
+enum class RPiState {
   POWERING_ON          = 0x00,  // Waiting to hear from camera.
   POWERED_ON           = 0x01,  // Heard from camera.
   POWERING_OFF         = 0x02,  // Waiting to power off the Raspberry Pi.
@@ -16,6 +16,12 @@ enum class CameraConnectionState {
   HOSTING_HOTSPOT       = 0x02, // yellow
   WIFI_SETUP            = 0x03, // pulsing green
   HOTSPOT_SETUP         = 0x04, // pulsing yellow
+};
+
+enum class RP2040State {
+  POWERED_ON            = 0x00,
+  POWERED_OFF           = 0x01,
+  WDT_REBOOT            = 0x02, // The WDT got triggered so the RP2040 needs to be rebooted.
 };
 
 #endif

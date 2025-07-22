@@ -8,7 +8,7 @@
 #define YELLOW 0xFF8300
 #define LED_OFF 0x000000
 
-void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnectionState, bool auxTerminalEnabled) {
+void StatusLED::updateLEDs(RPiState newState, CameraConnectionState newConnectionState, bool auxTerminalEnabled) {
   if (ledOn) { // Only update if the LED is already on. This is so once the LED is off it will stay off.
     if (newState != cameraState) {
       ledChange = getPitTimeMillis();
@@ -57,16 +57,16 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
   }
 
   switch (cameraState) {
-    case CameraState::POWERING_ON:
+    case RPiState::POWERING_ON:
       writeColor(0, 0, increasingSawTooth(220, 1, ledChange, 2000));
       break;
-    case CameraState::POWERING_OFF:
+    case RPiState::POWERING_OFF:
       writeColor(decreasingSawTooth(220, 1, ledChange, 2000), 0, 0);
       break;
-    case CameraState::POWERED_OFF:
+    case RPiState::POWERED_OFF:
       writeColor(RED);
       break;
-    case CameraState::POWER_ON_TIMEOUT:
+    case RPiState::POWER_ON_TIMEOUT:
       if (getPitTimeMillis() - lastLEDFlashUpdateTime > LED_FLASH_DURATION_MS) {
         ledFlashState = !ledFlashState;
         lastLEDFlashUpdateTime = getPitTimeMillis();
@@ -78,7 +78,7 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
       }
       break;
     
-    case CameraState::POWERED_ON:
+    case RPiState::POWERED_ON:
       // Flash light when aux terminal is enabled.
       if (auxTerminalEnabled && getPitTimeMillis() % 1000 < 200) {
         writeColor(LED_OFF);
@@ -105,7 +105,7 @@ void StatusLED::updateLEDs(CameraState newState, CameraConnectionState newConnec
           break;
       }
       break;
-    case CameraState::REBOOTING:
+    case RPiState::REBOOTING:
       if (getPitTimeMillis() - ledChange < 8000) {
         writeColor(decreasingSawTooth(220, 1, ledChange, 2000), 0, 0);
       } else {
