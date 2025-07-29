@@ -31,6 +31,7 @@
 #define REG_BOOT_DURATION_1      0x0C
 #define REG_BOOT_DURATION_2      0x0D
 #define REG_WDT_RP2040           0x0E
+#define REG_TIME_SINCE_INTERACTION 0x0F
 
 #define REG_BATTERY_CHECK_CTRL 0x10 //CTRL
 #define REG_BATTERY_LOW_VAL1   0x11 //LOW 1
@@ -107,6 +108,9 @@ volatile unsigned long poweredOffTime = 0;
 //volatile unsigned long pingPiTime = 0;
 volatile unsigned long piCommandRequestTime = 0;
 #define PI_COMMAND_TIMEOUT 5000
+
+// Used to show how long ago the button was pressed or camera first turned on.
+volatile unsigned long lastInteractionTimeMinutes = 0;
 
 // Timer to check if the button is being pressed in quick succession.
 volatile unsigned long previousButtonPressTime = 0;
@@ -686,6 +690,11 @@ void receiveEvent(int howMany) {
     rp2040WdtResetTime = getPitTimeMillis();
   }
 
+  // If wanting to read the time since the last user interaction, update its register.
+  if (address == REG_TIME_SINCE_INTERACTION) {
+    registers[REG_TIME_SINCE_INTERACTION] = uint8_t((0xFF, getPitTimeMinutes()-lastInteractionTimeMinutes));
+  }
+
   registerAddress = address;
   
   // Write data to register.
@@ -839,6 +848,7 @@ volatile unsigned long buttonPressDuration = 0;
 
 // buttonWakeUp is function called by the interrupt of the falling edge of the button.
 void buttonWakeUp() {
+  lastInteractionTimeMinutes = getPitTimeMinutes();
   if (digitalRead(BUTTON) == HIGH) {{
     return;
   }}
