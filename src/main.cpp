@@ -692,7 +692,7 @@ void receiveEvent(int howMany) {
 
   // If wanting to read the time since the last user interaction, update its register.
   if (address == REG_TIME_SINCE_INTERACTION) {
-    registers[REG_TIME_SINCE_INTERACTION] = uint8_t((0xFF, getPitTimeMinutes()-lastInteractionTimeMinutes));
+    registers[REG_TIME_SINCE_INTERACTION] = uint8_t(min(0xFF, getPitTimeMinutes()-lastInteractionTimeMinutes));
   }
 
   registerAddress = address;
@@ -846,12 +846,11 @@ void requestPiCommand(uint8_t command) {
 // After being processed the buttonPressDuration is reset to 0.
 volatile unsigned long buttonPressDuration = 0;
 
-// buttonWakeUp is function called by the interrupt of the falling edge of the button.
-void buttonWakeUp() {
-  lastInteractionTimeMinutes = getPitTimeMinutes();
+void buttonWakeUp() {  
   if (digitalRead(BUTTON) == HIGH) {{
     return;
   }}
+  lastInteractionTimeMinutes = getPitTimeMinutes();
   unsigned long start = getPitTimeMillis();
   buttonPressDuration = 0;
   while (digitalRead(BUTTON) == LOW) {
