@@ -27,3 +27,7 @@ unsigned long getPitTimeMillis() {
   time = time * 63;   // Multiply by 63 to get milliseconds (1000/16 = 62.5)
   return time;
 }
+
+unsigned long getPitTimeMinutes() {
+  return getPitTimeMillis() / 60000;
+}

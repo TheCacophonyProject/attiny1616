@@ -4,5 +4,6 @@
 void setupPIT();
 unsigned long getPitTime();
 unsigned long getPitTimeMillis();
+unsigned long getPitTimeMinutes();
 
 #endif
