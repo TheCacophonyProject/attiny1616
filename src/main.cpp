@@ -26,7 +26,7 @@
 #define REG_TC2_AGENT_READY      0x07
 #define REG_MINOR_VERSION        0x08
 #define REG_FLASH_ERRORS         0x09
-#define REG_CLEAR_ERRORS         0x0A
+#define REG_CLEAR_ERRORS         0x0A // this is deprecated, should just write 0x00 to the individual error registers to reset them.
 #define REG_PATCH_VERSION        0x0B
 #define REG_BOOT_DURATION_1      0x0C
 #define REG_BOOT_DURATION_2      0x0D
@@ -704,7 +704,7 @@ void receiveEvent(int howMany) {
       registers[REG_BATTERY_CHECK_CTRL] = 0;
     }
 
-    // Clear errors
+    // Clear errors. this is deprecated, should just write 0x00 to the individual error registers to reset them.
     if (registerAddress == REG_CLEAR_ERRORS && buffer[1] == 0x01) {
       registers[REG_ERRORS1] = 0x00;
       registers[REG_ERRORS2] = 0x00;
