@@ -780,8 +780,10 @@ void checkRP2040State() {
 }
 
 bool rp2040WDTTriggered() {
+  // getPutTimeMillis will reenable interrupts, so need to get the time now, before we disable them.
+  unsigned long nowMillis = getPitTimeMillis();
   noInterrupts();
-  bool triggered = (getPitTimeMillis() - rp2040WdtResetTime) > RP2040_WDT_RESET_INTERVAL;
+  bool triggered = (nowMillis - rp2040WdtResetTime) > RP2040_WDT_RESET_INTERVAL;
   interrupts();
   return triggered;
 }
