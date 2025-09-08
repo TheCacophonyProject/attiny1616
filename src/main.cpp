@@ -687,7 +687,7 @@ void receiveEvent(int howMany) {
 
   // WDT for RP2040
   if (address == REG_WDT_RP2040) {
-    rp2040WdtResetTime = getPitTimeMillis();
+    resetRP2040WDT();
   }
 
   // If wanting to read the time since the last user interaction, update its register.
@@ -760,21 +760,30 @@ void checkRP2040State() {
       break;
     case RP2040State::POWERED_ON:
       // Check if the WDT has triggered.
-      if (getPitTimeMillis() - rp2040WdtResetTime > RP2040_WDT_RESET_INTERVAL) {
+      if (rp2040WDTTriggered()) {
         powerOffRP2040();
         rp2040State = RP2040State::WDT_REBOOT;
-        rp2040WdtResetTime = getPitTimeMillis();
+        resetRP2040WDT();
         // Write an error.
         writeErrorFlag(ErrorCode::RP2040_WDT_TIMEOUT);
       }
       break;
     case RP2040State::WDT_REBOOT:
       // Check if enough time has passed to turn the RP2040 back on.  
+      noInterrupts();
       if (getPitTimeMillis() - rp2040WdtResetTime > RP2040_POWER_OFF_RESET_DURATION) {
         powerOnRP2040(false);
       }
+      interrupts();
       break;
   }
+}
+
+bool rp2040WDTTriggered() {
+  noInterrupts();
+  bool triggered = (getPitTimeMillis() - rp2040WdtResetTime) > RP2040_WDT_RESET_INTERVAL;
+  interrupts();
+  return triggered;
 }
 
 void powerOnRP2040(bool wdtRebootCheck) {
@@ -786,11 +795,17 @@ void powerOnRP2040(bool wdtRebootCheck) {
     // Already powered on, don't need to do anything.
     return;
   }
-  rp2040WdtResetTime = getPitTimeMillis();  // Reset the WDT for the RP2040.
+  resetRP2040WDT();
   rp2040ReadyToPowerOff = false;
   checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
   digitalWrite(EN_RP2040, LOW);
   rp2040State = RP2040State::POWERED_ON;
+}
+
+void resetRP2040WDT() {
+  noInterrupts();
+  rp2040WdtResetTime = getPitTimeMillis();
+  interrupts();
 }
 
 void powerOffRP2040() {

@@ -40,5 +40,7 @@ void regBatteryLVDivUpdate();
 void checkForLowBattery();
 void checkRegRP2040PiPowerCtrl();
 void checkRP2040State();
+bool rp2040WDTTriggered();
+void resetRP2040WDT();
 
 #endif // MAIN_H
