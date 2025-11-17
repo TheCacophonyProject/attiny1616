@@ -489,6 +489,7 @@ void checkCameraState() {
   // Check if the device has been in sleep for too long.
   if (cameraState == RPiState::POWERED_OFF && getPitTimeMillis() - poweredOffTime > MAX_POWERED_OFF_DURATION_MS) {
     writeErrorFlag(ErrorCode::RTC_TIMEOUT);
+    // TODO, should we be changing the REG_RP2040_PI_POWER_CTRL here instead of just powering on the RPi?
     powerOnRPi();
     return;
   }
@@ -547,23 +548,28 @@ bool isBitSet(uint8_t reg, uint8_t bitPos) {
 }
 
 void checkRegRP2040PiPowerCtrl() {
+  // If bit 0 is HIGH, then the RPi should be powered on.
+  // If this bit is LOW it is up to the RPi to decide when to power itself off.
+  // When the RPi powers itself off it will be detected by the ATtiny and then it will remove power to the RPi.
   if (isBitSet(registers[REG_RP2040_PI_POWER_CTRL], 0)) {
-    // RP2040 requires the RPi to be powered on. (RPi will read this so it knows to stay on, //TODO)
-    // If RPi is off, then power it on.
+    // If RPi is off, then power it on. Otherwise leave it in what state it is in.
     if (cameraState == RPiState::POWERED_OFF) {
       powerOnRPi();
     }
-  } // If this bit is not set it is up to the RPi to decide when to power itself off.
+  }
 
+  // If bit 1 is HIGH, then the RP2040 is requesting to be powered off.
+  // Once this bit is set HIGH and the RPi is off, the RP2040 will be powered off.
+  // This will then be set LOW from some user interactions, or the RTC triggering.
   if (isBitSet(registers[REG_RP2040_PI_POWER_CTRL], 1)) {
-    // Keep RP2040 on while RPi is powered on
+    // Even if it wants to power off, keep it on while the RPi is powered on.
     if (cameraState == RPiState::POWERED_ON) {
       powerOnRP2040();
     } else {
       powerOffRP2040();
     }
   } else {
-    // If bit is not set the RP2040 should be powered on.
+    // If bit is LOW the RP2040 wants to stay powered.
     powerOnRP2040();
   }
 }
@@ -743,11 +749,11 @@ void requestEvent() {
 //=============================ISR DEFINITIONS==================================//
 // Function attached to the pin connected to the alarm pin on the RTC.
 void rtcWakeUp() {
-  registers[REG_RP2040_PI_POWER_CTRL] = 0;
-  if (cameraState == RPiState::POWERED_OFF) {
-    checkForLowBattery();
-    powerOnRP2040();
-  }
+  // This will sometimes be triggered when the system is not to power on but to record an Audio recording.
+  // Leave bit 0 as is, so if RPi will stay in the state it is in.
+  // Write bit 1 to 0, so that the RP2040 will be powered on. Sometimes it will already be 0 but that is fine.
+  // We don't need to trigger the waking up of the RP2040 here as that will be caught in the checkRegRP2040PiPowerCtrl function.
+  registers[REG_RP2040_PI_POWER_CTRL] &= ~(1 << 1);
 }
 
 //======================= RP2040 FUNCTIONS ============================//
