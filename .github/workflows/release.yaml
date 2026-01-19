@@ -48,7 +48,7 @@ jobs:
             echo "MINOR_VERSION=${BASH_REMATCH[2]}" >> $GITHUB_ENV
             echo "PATCH_VERSION=${BASH_REMATCH[3]}" >> $GITHUB_ENV
           else
-            echo "Tag does not match version pattern"
+            echo "Tag does not match ver  sion pattern"
             exit 1
           fi
 

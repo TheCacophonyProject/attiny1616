@@ -146,18 +146,19 @@ void setup() {
   pinMode(PI_POWERED_OFF, INPUT_PULLUP);
   pinMode(PI_COMMAND_PIN, OUTPUT);
   digitalWrite(PI_COMMAND_PIN, LOW);
-  statusLED.writeColor(0, 0, 0);
+  // statusLED.writeColor(0, 0, 0);
 
   // Check for a low battery.
   checkForLowBattery();
-  statusLED.writeColor(255, 0, 0);
-  delay(100);
-  statusLED.writeColor(0, 255, 0);
-  delay(100);
-  statusLED.writeColor(0, 0, 255);
-  delay(100);
-  statusLED.writeColor(0, 0, 0);
-
+  // statusLED.writeColor(255, 0, 0);
+  // delay(100);
+  // statusLED.writeColor(0, 255, 0);
+  // delay(100);
+  // statusLED.writeColor(0, 0, 255);
+  // delay(100);
+  //leave as magentaish
+  // statusLED.writeColor(128,0,128);
+  // delay(3000);
   // Write I2C register write masks.
   for (int i = 0; i < REG_LEN; i++) {
     writeMasks[i] = 0xFF;
@@ -179,9 +180,9 @@ void setup() {
   // Write I2C initial register values.
   registers[REG_TYPE] = 0xCA;
   // When running `pio run` MAJOR, MINOR, and PATCH are set using environment variables.
-  registers[REG_MAJOR_VERSION] = MAJOR_VERSION; // If getting error set environment variable with `export MAJOR_VERSION=0`
-  registers[REG_MINOR_VERSION] = MINOR_VERSION; // If getting error set environment variable with `export MINOR_VERSION=0`
-  registers[REG_PATCH_VERSION] = PATCH_VERSION; // If getting error set environment variable with `export PATCH_VERSION=0`
+  registers[REG_MAJOR_VERSION] = 1; // If getting error set environment variable with `export MAJOR_VERSION=0`
+  registers[REG_MINOR_VERSION] = 0; // If getting error set environment variable with `export MINOR_VERSION=0`
+  registers[REG_PATCH_VERSION] = 9; // If getting error set environment variable with `export PATCH_VERSION=0`
 
   // Setup I2C
   Wire.begin(I2C_ADDRESS);
@@ -266,7 +267,8 @@ void loop() {
   if (quickFlash) {
     statusLED.writeColor(255, 255, 255);
     delay(100);
-    statusLED.writeColor(0, 0, 0);
+    // tealish
+    statusLED.writeColor(0, 128, 128);
     quickFlash = false;
   }
 
@@ -308,7 +310,7 @@ void loop() {
 
 void updateLEDs() {
   bool auxEnabled = registers[REG_AUX_TERMINAL] & 0x01;
-  statusLED.updateLEDs(cameraState, static_cast<CameraConnectionState>(registers[REG_CAMERA_CONNECTION]), auxEnabled);
+  // statusLED.updateLEDs(cameraState, static_cast<CameraConnectionState>(registers[REG_CAMERA_CONNECTION]), auxEnabled);
 }
 
 void writeErrorFlag(ErrorCode errorCode, bool flash = true) {
@@ -326,15 +328,23 @@ void writeErrorFlag(ErrorCode errorCode, bool flash = true) {
 }
 
 void checkPiCommsCountdown() {
+    statusLED.writeColor(0,128,0);
+
   if (cameraState != RPiState::POWERED_ON) {
+        delay(1000);
+  statusLED.writeColor(0,0,0);
     return;
   }
   if (getPitTimeMillis() - lastPiCommsTime > PI_COMMS_INTERVAL) {
     requestPiCommand(WRITE_CAMERA_STATE_FLAG);
   }
+    delay(1000);
+  statusLED.writeColor(0,0,0);
 }
 
 void checkPiCommands() {
+    statusLED.writeColor(255,0,0);
+
   // Check if the Raspberry Pi is responding to command requests
   if (registers[REG_PI_COMMANDS] != 0  &&
       getPitTimeMillis() - piCommandRequestTime > PI_COMMAND_TIMEOUT &&
@@ -351,6 +361,9 @@ void checkPiCommands() {
   } else {
     digitalWrite(PI_COMMAND_PIN, LOW);
   }
+  delay(1000);
+      statusLED.writeColor(0,0,0);
+
 }
 
 
@@ -437,6 +450,11 @@ void checkForLowBattery() {
 }
 
 void checkCameraState() {
+  //green and delay
+    // statusLED.writeColor(0,128,0);
+    // delay(100);
+    //     statusLED.writeColor(0,0,0);
+
   // Update camera state from register if valid.
   if (registers[REG_CAMERA_STATE] <= static_cast<uint8_t>(RPiState::REBOOTING)) {
     writeCameraState(static_cast<RPiState>(registers[REG_CAMERA_STATE]));
@@ -467,7 +485,7 @@ void checkCameraState() {
     // TODO Check if you need to wait here for a second or two for the flash to finish writing.
     if (digitalRead(PI_POWERED_OFF) == LOW) {
       powerRPiOffNow();
-      statusLED.off();
+      // statusLED.off(); 
     }
   }
 
@@ -507,7 +525,7 @@ void writeCameraState(RPiState newCameraState) {
     }
 
     cameraState = newCameraState;
-    updateLEDs();
+    // updateLEDs();
     if (cameraState == RPiState::POWERED_ON) {
       poweredOnTime = getPitTimeMillis();
     }
@@ -749,11 +767,21 @@ void requestEvent() {
 //=============================ISR DEFINITIONS==================================//
 // Function attached to the pin connected to the alarm pin on the RTC.
 void rtcWakeUp() {
+  //blue
+  statusLED.writeColor(245, 224, 66);
+  delay(3000);
+    // statusLED.writeColor(0,0,0);
+
   // This will sometimes be triggered when the system is not to power on but to record an Audio recording.
   // Leave bit 0 as is, so if RPi will stay in the state it is in.
   // Write bit 1 to 0, so that the RP2040 will be powered on. Sometimes it will already be 0 but that is fine.
   // We don't need to trigger the waking up of the RP2040 here as that will be caught in the checkRegRP2040PiPowerCtrl function.
-  registers[REG_RP2040_PI_POWER_CTRL] &= ~(1 << 1);
+   registers[REG_RP2040_PI_POWER_CTRL] = 1;
+  powerOnRP2040();
+  // registers[REG_RP2040_PI_POWER_CTRL] &= ~(1 << 1);
+  statusLED.writeColor(0, 0, 255);
+  delay(3000);
+
 }
 
 //======================= RP2040 FUNCTIONS ============================//
@@ -767,8 +795,11 @@ void checkRP2040State() {
     case RP2040State::POWERED_ON:
       // Check if the WDT has triggered.
       if (rp2040WDTTriggered()) {
-        powerOffRP2040();
-        rp2040State = RP2040State::WDT_REBOOT;
+        //teal rp2040 watchdog 
+            statusLED.writeColor(0,128,128);
+    delay(3000);
+        // powerOffRP2040();
+      //  rp2040State = RP2040State::WDT_REBOOT;
         resetRP2040WDT();
         // Write an error.
         writeErrorFlag(ErrorCode::RP2040_WDT_TIMEOUT);
@@ -821,12 +852,18 @@ void powerOffRP2040() {
     // Already powered off, don't need to do anything.
     return;
   }
+  //teal
+    statusLED.writeColor(0,128,128);
+    delay(3000);
   rp2040State = RP2040State::POWERED_OFF;
   digitalWrite(EN_RP2040, HIGH);
 }
 
 //======================= RASPBERRY_PI FUNCTIONS ============================//
 void powerOnRPi() {
+  //power on green
+  // statusLED.writeColor(0,128,0);
+    // delay(3000);
   checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
   digitalWrite(EN_5V, HIGH);
   powerOnRP2040();
@@ -835,6 +872,10 @@ void powerOnRPi() {
 }
 
 void powerRPiOffNow() {
+  //powering off rpi is red
+    statusLED.writeColor(128,0,0);
+    delay(3000);
+
   poweredOffTime = getPitTimeMillis();  //TODO Tets this
   digitalWrite(EN_5V, LOW);
   writeCameraState(RPiState::POWERED_OFF);
@@ -877,11 +918,11 @@ void buttonWakeUp() {
   unsigned long start = getPitTimeMillis();
   buttonPressDuration = 0;
   while (digitalRead(BUTTON) == LOW) {
-    if (buttonPressDuration > BUTTON_LONG_PRESS_DURATION) {
-      statusLED.writeColor(0x000000);
-    } else {
-      statusLED.writeColor(0xFFFFFF);
-    }
+    // if (buttonPressDuration > BUTTON_LONG_PRESS_DURATION) {
+    //   statusLED.writeColor(0x000000);
+    // } else {
+    //   statusLED.writeColor(0xFFFFFF);
+    // }
     delay(1);
     wdt_reset();
     buttonPressDuration++;
@@ -925,7 +966,7 @@ void processButtonPress() {
   }
   if (quickButtonPressCount > 20) {
     quickButtonPressCount = 0;
-    statusLED.writeColor(0xFFFFFF);
+    // statusLED.writeColor(0xFFFFFF);
     wdt_disable();
     delay(3000);
     requestPiCommand(TOGGLE_AUX_TERMINAL_FLAG);

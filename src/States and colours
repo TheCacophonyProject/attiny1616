@@ -1,0 +1,30 @@
+States and colours
+magenta setup()
+green powerOnRPi
+red powerRPiOffNow
+
+====WAKEUP
+yellow rtc wakeup
+3 seconds
+set register
+3 seconds
+blue
+
+
+
+wdt triggered teal
+
+
+
+current has no WDT
+
+
+//check pi commands
+red
+1 second
+white
+
+//checkPiCommsCountdown
+green
+1sec
+white
