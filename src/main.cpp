@@ -13,7 +13,7 @@
 
 //=====I2C DEFINITIONS=====//
 #define I2C_ADDRESS 0x25
-#define REG_LEN     0x24
+#define REG_LEN     0x31
 
 // Check registers.md for details on registers functions. //TODO, update registers.md
 #define REG_TYPE                 0x00
@@ -48,6 +48,10 @@
 #define REG_ERRORS3 0x22
 #define REG_ERRORS4 0x23
 
+#define REG_RESET_FLAGS 0x30
+
+#define REG_TRIGGER_TEST 0x40
+
 #define WRITE_CAMERA_STATE_FLAG  0x01
 #define READ_ERRORS_FLAG         0x01 << 1
 #define ENABLE_WIFI_FLAG         0x01 << 2
@@ -68,6 +72,7 @@ volatile bool lowBatteryCheck = false;        // Check main battery for a low ba
 volatile uint16_t lowBatteryValue = 0;        // Value that triggers a low battery condition.
 volatile bool registersWrittenTo = false;     // Flag to indicate that registers have been written to.
 volatile bool rp2040ReadyToPowerOff = false;  // Need to wait for RPi to power off so this flag is set by the RP2040 when it is ready.
+volatile bool runTest = false;
 
 //======== TIMERS ==========//
 // Time from getPitTimeMillis() of then the camera was powered on.
@@ -175,6 +180,7 @@ void setup() {
   writeMasks[REG_BATTERY_RTC_VAL2] = 0x00;
   writeMasks[REG_BOOT_DURATION_1] = 0x00;
   writeMasks[REG_BOOT_DURATION_2] = 0x00;
+  writeMasks[REG_RESET_FLAGS] = 0x00;
 
   // Write I2C initial register values.
   registers[REG_TYPE] = 0xCA;
@@ -182,6 +188,13 @@ void setup() {
   registers[REG_MAJOR_VERSION] = MAJOR_VERSION; // If getting error set environment variable with `export MAJOR_VERSION=0`
   registers[REG_MINOR_VERSION] = MINOR_VERSION; // If getting error set environment variable with `export MINOR_VERSION=0`
   registers[REG_PATCH_VERSION] = PATCH_VERSION; // If getting error set environment variable with `export PATCH_VERSION=0`
+
+  // The reset flags are stored in GPIOR0. We can read this to check the cause of reset.
+  // https://github.com/SpenceKonde/megaTinyCore/blob/master/megaavr/extras/Ref_Interrupts.md#isrs-benefit-the-most-from-using-the-gprs
+  // In section 12.5.1: Reset Flag Register. It describes the the value of the register that will get stored in GPIOR0.
+  registers[REG_RESET_FLAGS] = GPIOR0;
+  // TODO: If the reset cause is something bad (brownout or watchdog) it would be good to save this to eeprom as if it restarts again
+  // through a manual power cycle it would loose the bad reset cause, and this is a critical issue so we don't want to lose it.
 
   // Setup I2C
   Wire.begin(I2C_ADDRESS);
@@ -268,6 +281,15 @@ void loop() {
     delay(100);
     statusLED.writeColor(0, 0, 0);
     quickFlash = false;
+  }
+
+  if (runTest) {
+    runTest = false;
+    registers[REG_RESET_FLAGS] = 0x0f;
+    // Trigger a WDT reset.
+    while (true) {
+
+    }
   }
 
   // TODO Check this only when needed.
@@ -676,6 +698,10 @@ void receiveEvent(int howMany) {
   // Process data if CRC is valid
   //for (int i = 0; i < index - 2; ++i) {
   uint8_t address = buffer[0];
+
+  if (address == REG_TRIGGER_TEST) {
+    runTest = true;
+  }
   //uint8_t address = Wire.read();
   // Prevent from writing/reading to registers outside of the range.
   if (address >= REG_LEN) {
