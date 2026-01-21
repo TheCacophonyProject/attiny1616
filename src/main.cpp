@@ -6,6 +6,7 @@
 #include <avr/interrupt.h>
 #include <timer.h>
 #include <avr/io.h>
+#include <EEPROM.h>
 
 //=====DEFINITIONS=====//
 #define BATTERY_HYSTERESIS 10
@@ -52,11 +53,13 @@
 
 #define REG_TRIGGER_TEST 0x40
 
-#define WRITE_CAMERA_STATE_FLAG  0x01
-#define READ_ERRORS_FLAG         0x01 << 1
-#define ENABLE_WIFI_FLAG         0x01 << 2
-#define POWER_OFF_RPI            0x01 << 3
-#define TOGGLE_AUX_TERMINAL_FLAG 0x01 << 4
+//=====RPI COMMAND DEFINITIONS=====//
+#define WRITE_CAMERA_STATE_FLAG  0x01 << 0  // Request for the camera state to be written to the ATtiny
+#define READ_ERRORS_FLAG         0x01 << 1  // Request for the error flags to be read
+#define ENABLE_WIFI_FLAG         0x01 << 2  // Request for the wifi to be enabled
+#define POWER_OFF_RPI            0x01 << 3  // Request for the RPi to power off
+#define TOGGLE_AUX_TERMINAL_FLAG 0x01 << 4  // Request for the aux terminal to be toggled
+#define NEW_BOOT_CHECK_FLAG      0x01 << 5  // Request for the RPi to check the ATtiny after a boot (this is so the RPi can check the boot reason and the firmware version)
 
 #define WDT_DURATION WDTO_2S
 
@@ -193,8 +196,24 @@ void setup() {
   // https://github.com/SpenceKonde/megaTinyCore/blob/master/megaavr/extras/Ref_Interrupts.md#isrs-benefit-the-most-from-using-the-gprs
   // In section 12.5.1: Reset Flag Register. It describes the the value of the register that will get stored in GPIOR0.
   registers[REG_RESET_FLAGS] = GPIOR0;
-  // TODO: If the reset cause is something bad (brownout or watchdog) it would be good to save this to eeprom as if it restarts again
-  // through a manual power cycle it would loose the bad reset cause, and this is a critical issue so we don't want to lose it.
+
+  // If there was a brown out, make sure that flag is set in the EEPROM.
+  if (registers[REG_RESET_FLAGS] & RSTCTRL_BORF_bm) {
+    uint8_t eepromValue = EEPROM.read(REG_RESET_FLAGS);
+    if ((eepromValue & RSTCTRL_BORF_bm) == 0) {
+      // We only want to set this flag if it hasn't already been set to reduce EEPROM writes.
+      EEPROM.update(REG_RESET_FLAGS, eepromValue | RSTCTRL_BORF_bm);
+    }
+  }
+
+  // If there was a watchdog reset, make sure that flag is set in the EEPROM.
+  if (registers[REG_RESET_FLAGS] & RSTCTRL_WDRF_bm) {
+    uint8_t eepromValue = EEPROM.read(REG_RESET_FLAGS);
+    if (!(eepromValue & RSTCTRL_WDRF_bm) == 0) {
+      // We only want to set this flag if it hasn't already been set to reduce EEPROM writes.
+      EEPROM.update(REG_RESET_FLAGS, eepromValue | RSTCTRL_WDRF_bm);
+    }
+  }
 
   // Setup I2C
   Wire.begin(I2C_ADDRESS);
@@ -211,20 +230,10 @@ void setup() {
   powerOnRPi();
   powerOnRP2040();
 
-  /*
-  // Checking for the reason for booting doesn't seam to work.
-  if (RSTCTRL.RSTFR & RSTCTRL_WDRF_bm) {
-    RSTCTRL.RSTFR = RSTCTRL_WDRF_bm; // Clear the watchdog reset flag
-    writeErrorFlag(ErrorCode::WDT_TRIGGERED, true);
-    delay(10000);
-  }
+  // On a new boot we want to request the RPi to check the ATtiny is the version it expects and 
+  // check the boot reason.
+  requestPiCommand(NEW_BOOT_CHECK_FLAG);
 
-  if (RSTCTRL.RSTFR & RSTCTRL_BORF_bm) {
-    RSTCTRL.RSTFR = RSTCTRL_BORF_bm; // Clear the brown out reset flag
-    writeErrorFlag(ErrorCode::BOR_TRIGGERED, true);
-    delay(10000);
-  }
-  */
   wdt_reset();
   wdt_enable(WDT_DURATION);
 }
@@ -359,9 +368,9 @@ void checkPiCommsCountdown() {
 void checkPiCommands() {
   // Check if the Raspberry Pi is responding to command requests
   if (registers[REG_PI_COMMANDS] != 0  &&
-      getPitTimeMillis() - piCommandRequestTime > PI_COMMAND_TIMEOUT &&
-      cameraState == RPiState::POWERED_ON &&
-      getPitTimeMillis() - poweredOnTime > PI_COMMAND_TIMEOUT) {
+    getPitTimeMillis() - piCommandRequestTime > PI_COMMAND_TIMEOUT &&
+    cameraState == RPiState::POWERED_ON &&
+    getPitTimeMillis() - poweredOnTime > PI_COMMAND_TIMEOUT) {
     writeErrorFlag(ErrorCode::PI_COMMAND_TIMEDOUT);
     registers[REG_PI_COMMANDS] = 0;
     // TODO, should we be restarting the Raspberry Pi here?
