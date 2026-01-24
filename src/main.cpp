@@ -52,11 +52,13 @@
 
 #define REG_TRIGGER_TEST 0x40
 
-#define WRITE_CAMERA_STATE_FLAG  0x01
-#define READ_ERRORS_FLAG         0x01 << 1
-#define ENABLE_WIFI_FLAG         0x01 << 2
-#define POWER_OFF_RPI            0x01 << 3
-#define TOGGLE_AUX_TERMINAL_FLAG 0x01 << 4
+//=====RPI COMMAND DEFINITIONS=====//
+#define WRITE_CAMERA_STATE_FLAG  0x01 << 0  // Request for the camera state to be written to the ATtiny
+#define READ_ERRORS_FLAG         0x01 << 1  // Request for the error flags to be read
+#define ENABLE_WIFI_FLAG         0x01 << 2  // Request for the wifi to be enabled
+#define POWER_OFF_RPI            0x01 << 3  // Request for the RPi to power off
+#define TOGGLE_AUX_TERMINAL_FLAG 0x01 << 4  // Request for the aux terminal to be toggled
+#define NEW_BOOT_CHECK_FLAG      0x01 << 5  // Request for the RPi to check the ATtiny after a boot (this is so the RPi can check the boot reason and the firmware version)
 
 #define WDT_DURATION WDTO_2S
 
@@ -193,8 +195,6 @@ void setup() {
   // https://github.com/SpenceKonde/megaTinyCore/blob/master/megaavr/extras/Ref_Interrupts.md#isrs-benefit-the-most-from-using-the-gprs
   // In section 12.5.1: Reset Flag Register. It describes the the value of the register that will get stored in GPIOR0.
   registers[REG_RESET_FLAGS] = GPIOR0;
-  // TODO: If the reset cause is something bad (brownout or watchdog) it would be good to save this to eeprom as if it restarts again
-  // through a manual power cycle it would loose the bad reset cause, and this is a critical issue so we don't want to lose it.
 
   // Setup I2C
   Wire.begin(I2C_ADDRESS);
@@ -211,20 +211,10 @@ void setup() {
   powerOnRPi();
   powerOnRP2040();
 
-  /*
-  // Checking for the reason for booting doesn't seam to work.
-  if (RSTCTRL.RSTFR & RSTCTRL_WDRF_bm) {
-    RSTCTRL.RSTFR = RSTCTRL_WDRF_bm; // Clear the watchdog reset flag
-    writeErrorFlag(ErrorCode::WDT_TRIGGERED, true);
-    delay(10000);
-  }
+  // On a new boot we want to request the RPi to check the ATtiny is the version it expects and 
+  // check the boot reason.
+  requestPiCommand(NEW_BOOT_CHECK_FLAG);
 
-  if (RSTCTRL.RSTFR & RSTCTRL_BORF_bm) {
-    RSTCTRL.RSTFR = RSTCTRL_BORF_bm; // Clear the brown out reset flag
-    writeErrorFlag(ErrorCode::BOR_TRIGGERED, true);
-    delay(10000);
-  }
-  */
   wdt_reset();
   wdt_enable(WDT_DURATION);
 }
@@ -285,11 +275,11 @@ void loop() {
 
   if (runTest) {
     runTest = false;
-    registers[REG_RESET_FLAGS] = 0x0f;
-    // Trigger a WDT reset.
-    while (true) {
+    // This can be triggered by writing to the address 0x40 from the RPi.
+    // So running the command `tc2-hat-i2c write --address 0x25 --reg 0x40 --val 0x00` will trigger this.
 
-    }
+    // Trigger a WDT reset by getting stuck in a loop.
+    // while (true) {}
   }
 
   // TODO Check this only when needed.
@@ -359,9 +349,9 @@ void checkPiCommsCountdown() {
 void checkPiCommands() {
   // Check if the Raspberry Pi is responding to command requests
   if (registers[REG_PI_COMMANDS] != 0  &&
-      getPitTimeMillis() - piCommandRequestTime > PI_COMMAND_TIMEOUT &&
-      cameraState == RPiState::POWERED_ON &&
-      getPitTimeMillis() - poweredOnTime > PI_COMMAND_TIMEOUT) {
+    getPitTimeMillis() - piCommandRequestTime > PI_COMMAND_TIMEOUT &&
+    cameraState == RPiState::POWERED_ON &&
+    getPitTimeMillis() - poweredOnTime > PI_COMMAND_TIMEOUT) {
     writeErrorFlag(ErrorCode::PI_COMMAND_TIMEDOUT);
     registers[REG_PI_COMMANDS] = 0;
     // TODO, should we be restarting the Raspberry Pi here?
@@ -701,6 +691,7 @@ void receiveEvent(int howMany) {
 
   if (address == REG_TRIGGER_TEST) {
     runTest = true;
+    return;
   }
   //uint8_t address = Wire.read();
   // Prevent from writing/reading to registers outside of the range.
