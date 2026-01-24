@@ -6,7 +6,6 @@
 #include <avr/interrupt.h>
 #include <timer.h>
 #include <avr/io.h>
-#include <EEPROM.h>
 
 //=====DEFINITIONS=====//
 #define BATTERY_HYSTERESIS 10
@@ -197,24 +196,6 @@ void setup() {
   // In section 12.5.1: Reset Flag Register. It describes the the value of the register that will get stored in GPIOR0.
   registers[REG_RESET_FLAGS] = GPIOR0;
 
-  // If there was a brown out, make sure that flag is set in the EEPROM.
-  if (registers[REG_RESET_FLAGS] & RSTCTRL_BORF_bm) {
-    uint8_t eepromValue = EEPROM.read(REG_RESET_FLAGS);
-    if ((eepromValue & RSTCTRL_BORF_bm) == 0) {
-      // We only want to set this flag if it hasn't already been set to reduce EEPROM writes.
-      EEPROM.update(REG_RESET_FLAGS, eepromValue | RSTCTRL_BORF_bm);
-    }
-  }
-
-  // If there was a watchdog reset, make sure that flag is set in the EEPROM.
-  if (registers[REG_RESET_FLAGS] & RSTCTRL_WDRF_bm) {
-    uint8_t eepromValue = EEPROM.read(REG_RESET_FLAGS);
-    if (!(eepromValue & RSTCTRL_WDRF_bm) == 0) {
-      // We only want to set this flag if it hasn't already been set to reduce EEPROM writes.
-      EEPROM.update(REG_RESET_FLAGS, eepromValue | RSTCTRL_WDRF_bm);
-    }
-  }
-
   // Setup I2C
   Wire.begin(I2C_ADDRESS);
   Wire.onReceive(receiveEvent);
@@ -294,11 +275,11 @@ void loop() {
 
   if (runTest) {
     runTest = false;
-    registers[REG_RESET_FLAGS] = 0x0f;
-    // Trigger a WDT reset.
-    while (true) {
+    // This can be triggered by writing to the address 0x40 from the RPi.
+    // So running the command `tc2-hat-i2c write --address 0x25 --reg 0x40 --val 0x00` will trigger this.
 
-    }
+    // Trigger a WDT reset by getting stuck in a loop.
+    // while (true) {}
   }
 
   // TODO Check this only when needed.
@@ -710,6 +691,7 @@ void receiveEvent(int howMany) {
 
   if (address == REG_TRIGGER_TEST) {
     runTest = true;
+    return;
   }
   //uint8_t address = Wire.read();
   // Prevent from writing/reading to registers outside of the range.
