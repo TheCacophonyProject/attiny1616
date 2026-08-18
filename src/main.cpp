@@ -105,6 +105,11 @@ volatile unsigned long rp2040PoweringOffResetTime = 0;
 volatile unsigned long poweringOffTime = 0;
 #define POWER_OFF_DELAY_MS 60000
 
+// Delay after gpio-poweroff asserts PI_POWERED_OFF before cutting EN_5V.
+// Gives flash a chance to settle and keeps the rail up briefly after the Pi
+// has finished its own shutdown sequence.
+#define PI_POWERED_OFF_SETTLE_MS 2000
+
 // Timer to check that the ATtiny is woken up by the RTC_ALARM interrupt after at least 24 hours. 
 // If reaches MAX_POWERED_OFF_DURATION_MS then the camera is reset and a SLEEP_ error flag is set in the I2C register
 volatile unsigned long poweredOffTime = 0; 
@@ -476,14 +481,17 @@ void checkCameraState() {
   // Check if the camera has powered off.
   if (cameraState == RPiState::POWERING_OFF) {
     // gpio-poweroff in config.txt for the RPi will drive a pin low when it powers off.
-    // TODO Check if you need to wait here for a second or two for the flash to finish writing.
+    // Wait briefly after the signal so eMMC/flash can finish and any Pi-side HAT
+    // quiesce (mux park) has completed before we drop EN_5V.
     if (digitalRead(PI_POWERED_OFF) == LOW) {
+      delay(PI_POWERED_OFF_SETTLE_MS);
       powerRPiOffNow();
       statusLED.off();
     }
   }
 
   if ((cameraState == RPiState::POWERED_ON || cameraState == RPiState::REBOOTING) && digitalRead(PI_POWERED_OFF) == LOW) {
+    delay(PI_POWERED_OFF_SETTLE_MS);
     powerRPiOffNow();
     delay(1000);
     powerOnRPi();
