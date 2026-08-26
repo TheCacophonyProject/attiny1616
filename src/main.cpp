@@ -105,10 +105,16 @@ volatile unsigned long rp2040PoweringOffResetTime = 0;
 volatile unsigned long poweringOffTime = 0;
 #define POWER_OFF_DELAY_MS 60000
 
-// Delay after gpio-poweroff asserts PI_POWERED_OFF before cutting EN_5V.
-// Gives flash a chance to settle and keeps the rail up briefly after the Pi
-// has finished its own shutdown sequence.
+// Hold EN_5V up for this long after gpio-poweroff asserts PI_POWERED_OFF, so
+// flash writes finish before the rail drops. Timed across loop() iterations
+// rather than with delay(), because the WDT is only retriggered in loop().
 #define PI_POWERED_OFF_SETTLE_MS 2000
+
+// Set when PI_POWERED_OFF is first seen asserted. gpio-poweroff pulses the pin
+// (active, inactive, active), so the assertion is latched rather than required
+// to stay low for the whole settle period.
+volatile bool piPoweredOffSettling = false;
+volatile unsigned long piPoweredOffSignalTime = 0;
 
 // Timer to check that the ATtiny is woken up by the RTC_ALARM interrupt after at least 24 hours. 
 // If reaches MAX_POWERED_OFF_DURATION_MS then the camera is reset and a SLEEP_ error flag is set in the I2C register
@@ -481,17 +487,19 @@ void checkCameraState() {
   // Check if the camera has powered off.
   if (cameraState == RPiState::POWERING_OFF) {
     // gpio-poweroff in config.txt for the RPi will drive a pin low when it powers off.
-    // Wait briefly after the signal so eMMC/flash can finish and any Pi-side HAT
-    // quiesce (mux park) has completed before we drop EN_5V.
-    if (digitalRead(PI_POWERED_OFF) == LOW) {
-      delay(PI_POWERED_OFF_SETTLE_MS);
+    // Give flash time to settle, and the Pi-side HAT quiesce time to complete,
+    // before dropping EN_5V.
+    if (digitalRead(PI_POWERED_OFF) == LOW && !piPoweredOffSettling) {
+      piPoweredOffSettling = true;
+      piPoweredOffSignalTime = getPitTimeMillis();
+    }
+    if (piPoweredOffSettling && getPitTimeMillis() - piPoweredOffSignalTime >= PI_POWERED_OFF_SETTLE_MS) {
       powerRPiOffNow();
       statusLED.off();
     }
   }
 
   if ((cameraState == RPiState::POWERED_ON || cameraState == RPiState::REBOOTING) && digitalRead(PI_POWERED_OFF) == LOW) {
-    delay(PI_POWERED_OFF_SETTLE_MS);
     powerRPiOffNow();
     delay(1000);
     powerOnRPi();
@@ -853,6 +861,7 @@ void powerOffRP2040() {
 //======================= RASPBERRY_PI FUNCTIONS ============================//
 void powerOnRPi() {
   checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
+  piPoweredOffSettling = false;
   digitalWrite(EN_5V, HIGH);
   powerOnRP2040();
   writeCameraState(RPiState::POWERING_ON);
@@ -861,6 +870,7 @@ void powerOnRPi() {
 
 void powerRPiOffNow() {
   poweredOffTime = getPitTimeMillis();  //TODO Tets this
+  piPoweredOffSettling = false;
   digitalWrite(EN_5V, LOW);
   writeCameraState(RPiState::POWERED_OFF);
   registers[REG_TC2_AGENT_READY] = 0;
