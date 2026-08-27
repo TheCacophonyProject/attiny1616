@@ -105,6 +105,17 @@ volatile unsigned long rp2040PoweringOffResetTime = 0;
 volatile unsigned long poweringOffTime = 0;
 #define POWER_OFF_DELAY_MS 60000
 
+// Hold EN_5V up for this long after gpio-poweroff asserts PI_POWERED_OFF, so
+// flash writes finish before the rail drops. Timed across loop() iterations
+// rather than with delay(), because the WDT is only retriggered in loop().
+#define PI_POWERED_OFF_SETTLE_MS 2000
+
+// Set when PI_POWERED_OFF is first seen asserted. gpio-poweroff pulses the pin
+// (active, inactive, active), so the assertion is latched rather than required
+// to stay low for the whole settle period.
+volatile bool piPoweredOffSettling = false;
+volatile unsigned long piPoweredOffSignalTime = 0;
+
 // Timer to check that the ATtiny is woken up by the RTC_ALARM interrupt after at least 24 hours. 
 // If reaches MAX_POWERED_OFF_DURATION_MS then the camera is reset and a SLEEP_ error flag is set in the I2C register
 volatile unsigned long poweredOffTime = 0; 
@@ -476,8 +487,13 @@ void checkCameraState() {
   // Check if the camera has powered off.
   if (cameraState == RPiState::POWERING_OFF) {
     // gpio-poweroff in config.txt for the RPi will drive a pin low when it powers off.
-    // TODO Check if you need to wait here for a second or two for the flash to finish writing.
-    if (digitalRead(PI_POWERED_OFF) == LOW) {
+    // Give flash time to settle, and the Pi-side HAT quiesce time to complete,
+    // before dropping EN_5V.
+    if (digitalRead(PI_POWERED_OFF) == LOW && !piPoweredOffSettling) {
+      piPoweredOffSettling = true;
+      piPoweredOffSignalTime = getPitTimeMillis();
+    }
+    if (piPoweredOffSettling && getPitTimeMillis() - piPoweredOffSignalTime >= PI_POWERED_OFF_SETTLE_MS) {
       powerRPiOffNow();
       statusLED.off();
     }
@@ -845,6 +861,7 @@ void powerOffRP2040() {
 //======================= RASPBERRY_PI FUNCTIONS ============================//
 void powerOnRPi() {
   checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
+  piPoweredOffSettling = false;
   digitalWrite(EN_5V, HIGH);
   powerOnRP2040();
   writeCameraState(RPiState::POWERING_ON);
@@ -853,6 +870,7 @@ void powerOnRPi() {
 
 void powerRPiOffNow() {
   poweredOffTime = getPitTimeMillis();  //TODO Tets this
+  piPoweredOffSettling = false;
   digitalWrite(EN_5V, LOW);
   writeCameraState(RPiState::POWERED_OFF);
   registers[REG_TC2_AGENT_READY] = 0;
