@@ -155,7 +155,6 @@ void setup() {
   statusLED.writeColor(0, 0, 0);
 
   // Check for a low battery.
-  checkForLowBattery();
   statusLED.writeColor(255, 0, 0);
   delay(100);
   statusLED.writeColor(0, 255, 0);
@@ -185,7 +184,13 @@ void setup() {
 
   // Write I2C initial register values.
   registers[REG_TYPE] = 0xCA;
-  // When running `pio run` MAJOR, MINOR, and PATCH are set using environment variables.
+
+// When running `pio run` MAJOR, MINOR, and PATCH are set using environment variables.
+#ifdef __INTELLISENSE__ // This just prevents errors showing up in intellisense
+#define MAJOR_VERSION 0
+#define MINOR_VERSION 0
+#define PATCH_VERSION 0
+#endif
   registers[REG_MAJOR_VERSION] = MAJOR_VERSION; // If getting error set environment variable with `export MAJOR_VERSION=0`
   registers[REG_MINOR_VERSION] = MINOR_VERSION; // If getting error set environment variable with `export MINOR_VERSION=0`
   registers[REG_PATCH_VERSION] = PATCH_VERSION; // If getting error set environment variable with `export PATCH_VERSION=0`
@@ -296,7 +301,6 @@ void loop() {
   buttonWakeUp();
 
   processButtonPress();
-  checkForLowBattery();
   checkCameraState();
   checkPiCommands();
   checkPiCommsCountdown();
@@ -399,51 +403,6 @@ void checkBatteryRTC() {
   analogRead(RTC_BAT_SENSE);
   delayMicroseconds(200);
   battRTC = sampleBattery(RTC_BAT_SENSE);
-}
-
-void checkForLowBattery() {
-  //TODO
-  /*
-  int samples = 10;
-  int batteryVoltage = 0;
-  for (int i = 0; i < samples; i++) {
-    batteryVoltage += analogRead(MAIN_BAT_SENSE);
-  }
-  mainBatteryVoltage = batteryVoltage / samples;
-
-  // Check if battery voltage is OK.
-  if (!lowBatteryCheck || mainBatteryVoltage > lowBatteryValue || mainBatteryVoltage <= 1) {
-    return; // Battery is OK.
-  }
-
-  powerRPiOffNow();
-  
-  // Flash LED to show battery is low
-  for (int i = 0; i < 3; i++) {
-    statusLED.writeColor(0xFF, 0x00, 0x00);
-    delay(300);
-    statusLED.writeColor(0x00, 0x00, 0x00);
-    delay(300);  
-  }
-
-  // Loop checking battery voltage until battery is better
-  while (1) {
-    // Check main battery, making sure it reaches the threshold at least 10 times in a row.
-    bool lowBattery = false;
-    for (int i = 0; i < 10; i++) {
-      if (analogRead(MAIN_BAT_SENSE) < lowBatteryValue + BATTERY_HYSTERESIS) {
-        lowBattery = true;
-        break;
-      }
-    }
-    if (!lowBattery) {
-      return; // Battery is better again, return to normal loop.
-    }
-
-    // TODO go to deep sleep.
-    // Wait for PIT to wake up again and then check battery. 
-  }
-  */
 }
 
 void checkCameraState() {
@@ -582,36 +541,6 @@ void checkRegRP2040PiPowerCtrl() {
     // If bit is LOW the RP2040 wants to stay powered.
     powerOnRP2040();
   }
-}
-
-//REG_BATTERY3
-// 7-3, reserved
-// bit 2: read only. 0 = no low battery, 1 = low battery
-// bit 1: write high to disable low battery.
-// bit 0: write high to enable low battery.
-void lowBatteryRegUpdate() {
-  //TODO
-  /*
-  // Check if low battery check is wanting to be enabled.
-  if (registers[REG_BATTERY3] & 0x01) {
-    uint16_t newLowBatteryVal = (registers[REG_BATTERY4] << 8) | registers[REG_BATTERY5];
-    checkForLowBattery();
-    // Check that the new value is not less than the current battery value with a bit of a buffer.
-    // This is to prevent the case when it might be set too high and the device will never turn on fully as it always has a "low" battery.
-    // 31 should be about 0.1V
-    if (newLowBatteryVal < mainBatteryVoltage-31) {
-      registers[REG_BATTERY3] = 0x00;
-      writeErrorFlag(ErrorCode::LOW_BATTERY_LEVEL_SET_TOO_LOW);
-      return;
-    }
-    registers[REG_BATTERY3] = 0x01 << 2; // Set bit 2 to 1, signaling that it is enabled.
-    return;
-  }
-  // Check if low battery check is wanting to be disabled.
-  if (registers[REG_BATTERY3] & 0x01 << 1) {
-    registers[REG_BATTERY3] = 0x00;
-  }
-  */
 }
 
 //============================== I2C FUNCTIONS ==============================//
@@ -818,7 +747,6 @@ void powerOnRP2040(bool wdtRebootCheck) {
   }
   resetRP2040WDT();
   rp2040ReadyToPowerOff = false;
-  checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
   digitalWrite(EN_RP2040, LOW);
   rp2040State = RP2040State::POWERED_ON;
 }
@@ -840,7 +768,6 @@ void powerOffRP2040() {
 
 //======================= RASPBERRY_PI FUNCTIONS ============================//
 void powerOnRPi() {
-  checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
   digitalWrite(EN_5V, HIGH);
   powerOnRP2040();
   writeCameraState(RPiState::POWERING_ON);
