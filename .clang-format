@@ -1,0 +1,42 @@
+# Without this file the VS Code C/C++ extension formats with its "Visual Studio"
+# fallback style, which reformats the whole project on save (Allman braces,
+# collapsed #define columns, rewrapped comments). This matches the style the
+# source is already written in.
+Language: Cpp
+BasedOnStyle: LLVM
+
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+
+# Braces on the same line as the statement.
+BreakBeforeBraces: Attach
+
+# No column limit, so existing line breaks are left alone and the long comments
+# and register tables are not rewrapped.
+ColumnLimit: 0
+ReflowComments: false
+
+# With no column limit everything "fits" on one line, so short function bodies
+# and single statement ifs have to be kept from being joined up.
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Keep the aligned columns in the register #define tables and trailing comments.
+AlignConsecutiveMacros: Consecutive
+AlignTrailingComments: true
+
+# Keeps the '=' aligned in the enums in CameraState.h and ErrorCodes.h. This also
+# aligns consecutive assignments elsewhere, such as the writeMasks block in setup().
+AlignConsecutiveAssignments: Consecutive
+
+# Leave //TODO and commented out code as written, and don't reorder the includes
+# (Arduino.h has to come first).
+SpacesInLineCommentPrefix:
+  Minimum: 0
+  Maximum: -1
+SortIncludes: Never
