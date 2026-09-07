@@ -221,26 +221,28 @@ void setup() {
 
 volatile uint8_t sleepMode = SLEEP_MODE_IDLE;
 
+// Update sleep mode will update the sleep mode that is applied or if any.
+// Use slaveTransactionOpen() (the AP bit) rather than TWI_APIF_bm/TWI_DIF_bm: those flags are
+// only set while the TWI is waiting to be serviced, so they read clear for most of a transaction.
 void updateSleepMode() {
+  // If an I2C transaction is open we should not update the sleep state so we just return early.
+  if (Wire.slaveTransactionOpen() != 0) {
+    return;
+  }
+
+  // Sleep mode changes depending on the LED state because the PWM LED signals don't work in this power mode.
   uint8_t newSleepMode = statusLED.isOn() ? SLEEP_MODE_IDLE : SLEEP_MODE_PWR_DOWN;
 
-  if (newSleepMode != sleepMode) {
-    noInterrupts();
-
-    // Check if the I2C is currently active
-    if (TWI0.SSTATUS & (TWI_APIF_bm | TWI_DIF_bm)) {
-      interrupts();
-      return;
-    }
-
+  noInterrupts();
+  if (Wire.slaveTransactionOpen() == 0 &&                  // Checking again if we are in a transaction after interrupts have been disabled.
+      (SLPCTRL.CTRLA & SLPCTRL_SMODE_gm) != newSleepMode) { // Check if the new sleep state is actually any different and needs updating.
     sleepMode = newSleepMode;
 
     sleep_disable();
     set_sleep_mode(sleepMode);
     sleep_enable();
-
-    interrupts();
   }
+  interrupts();
 }
 
 // The ATtiny gets into a state where it will hold the I2C SDA low. Not too sure on the reasons for this but this is a bit of a hack to recover from it. //TODO Find out why this happens.
