@@ -8,7 +8,7 @@
 #include <avr/io.h>
 
 //=====DEFINITIONS=====//
-#define BATTERY_HYSTERESIS 10
+#define BATTERY_HYSTERESIS         10
 #define BUTTON_LONG_PRESS_DURATION 1200
 
 //=====I2C DEFINITIONS=====//
@@ -16,32 +16,32 @@
 #define REG_LEN     0x31
 
 // Check registers.md for details on registers functions. //TODO, update registers.md
-#define REG_TYPE                 0x00
-#define REG_MAJOR_VERSION        0x01
-#define REG_CAMERA_STATE         0x02
-#define REG_CAMERA_CONNECTION    0x03
-#define REG_PI_COMMANDS          0x04
-#define REG_RP2040_PI_POWER_CTRL 0x05
-#define REG_AUX_TERMINAL         0x06
-#define REG_TC2_AGENT_READY      0x07
-#define REG_MINOR_VERSION        0x08
-#define REG_FLASH_ERRORS         0x09
-#define REG_CLEAR_ERRORS         0x0A // this is deprecated, should just write 0x00 to the individual error registers to reset them.
-#define REG_PATCH_VERSION        0x0B
-#define REG_BOOT_DURATION_1      0x0C
-#define REG_BOOT_DURATION_2      0x0D
-#define REG_WDT_RP2040           0x0E
+#define REG_TYPE                   0x00
+#define REG_MAJOR_VERSION          0x01
+#define REG_CAMERA_STATE           0x02
+#define REG_CAMERA_CONNECTION      0x03
+#define REG_PI_COMMANDS            0x04
+#define REG_RP2040_PI_POWER_CTRL   0x05
+#define REG_AUX_TERMINAL           0x06
+#define REG_TC2_AGENT_READY        0x07
+#define REG_MINOR_VERSION          0x08
+#define REG_FLASH_ERRORS           0x09
+#define REG_CLEAR_ERRORS           0x0A // this is deprecated, should just write 0x00 to the individual error registers to reset them.
+#define REG_PATCH_VERSION          0x0B
+#define REG_BOOT_DURATION_1        0x0C
+#define REG_BOOT_DURATION_2        0x0D
+#define REG_WDT_RP2040             0x0E
 #define REG_TIME_SINCE_INTERACTION 0x0F
 
-#define REG_BATTERY_CHECK_CTRL 0x10 //CTRL
-#define REG_BATTERY_LOW_VAL1   0x11 //LOW 1
-#define REG_BATTERY_LOW_VAL2   0x12 //LOW 2
-#define REG_BATTERY_LV_DIV_VAL1    0x13 //HV1
-#define REG_BATTERY_LV_DIV_VAL2    0x14 //HV2
-#define REG_BATTERY_HV_DIV_VAL1    0x15 //LV1
-#define REG_BATTERY_HV_DIV_VAL2    0x16 //LV2
-#define REG_BATTERY_RTC_VAL1   0x17 //LV1
-#define REG_BATTERY_RTC_VAL2   0x18 //LV2
+#define REG_BATTERY_CHECK_CTRL  0x10 //CTRL
+#define REG_BATTERY_LOW_VAL1    0x11 //LOW 1
+#define REG_BATTERY_LOW_VAL2    0x12 //LOW 2
+#define REG_BATTERY_LV_DIV_VAL1 0x13 //HV1
+#define REG_BATTERY_LV_DIV_VAL2 0x14 //HV2
+#define REG_BATTERY_HV_DIV_VAL1 0x15 //LV1
+#define REG_BATTERY_HV_DIV_VAL2 0x16 //LV2
+#define REG_BATTERY_RTC_VAL1    0x17 //LV1
+#define REG_BATTERY_RTC_VAL2    0x18 //LV2
 
 #define REG_ERRORS1 0x20
 #define REG_ERRORS2 0x21
@@ -53,28 +53,28 @@
 #define REG_TRIGGER_TEST 0x40
 
 //=====RPI COMMAND DEFINITIONS=====//
-#define WRITE_CAMERA_STATE_FLAG  0x01 << 0  // Request for the camera state to be written to the ATtiny
-#define READ_ERRORS_FLAG         0x01 << 1  // Request for the error flags to be read
-#define ENABLE_WIFI_FLAG         0x01 << 2  // Request for the wifi to be enabled
-#define POWER_OFF_RPI            0x01 << 3  // Request for the RPi to power off
-#define TOGGLE_AUX_TERMINAL_FLAG 0x01 << 4  // Request for the aux terminal to be toggled
-#define NEW_BOOT_CHECK_FLAG      0x01 << 5  // Request for the RPi to check the ATtiny after a boot (this is so the RPi can check the boot reason and the firmware version)
+#define WRITE_CAMERA_STATE_FLAG  0x01 << 0 // Request for the camera state to be written to the ATtiny
+#define READ_ERRORS_FLAG         0x01 << 1 // Request for the error flags to be read
+#define ENABLE_WIFI_FLAG         0x01 << 2 // Request for the wifi to be enabled
+#define POWER_OFF_RPI            0x01 << 3 // Request for the RPi to power off
+#define TOGGLE_AUX_TERMINAL_FLAG 0x01 << 4 // Request for the aux terminal to be toggled
+#define NEW_BOOT_CHECK_FLAG      0x01 << 5 // Request for the RPi to check the ATtiny after a boot (this is so the RPi can check the boot reason and the firmware version)
 
 #define WDT_DURATION WDTO_2S
 
 uint8_t writeMasks[REG_LEN] = {}; // Should all be initialised to 0xFF
 
 //=====GLOBAL VARIABLES=====//
-volatile uint8_t registers[REG_LEN] = {0};
-volatile uint8_t registerAddress = 0;
-volatile uint16_t battLowVoltageDiv = 0;      // Raw reading value from ADC
+volatile uint8_t registers[REG_LEN]  = {0};
+volatile uint8_t registerAddress     = 0;
+volatile uint16_t battLowVoltageDiv  = 0;     // Raw reading value from ADC
 volatile uint16_t battHighVoltageDiv = 0;     // Raw reading value from ADC
-volatile uint16_t battRTC = 0;      // Raw reading value from ADC
-volatile bool lowBatteryCheck = false;        // Check main battery for a low battery condition.
-volatile uint16_t lowBatteryValue = 0;        // Value that triggers a low battery condition.
-volatile bool registersWrittenTo = false;     // Flag to indicate that registers have been written to.
-volatile bool rp2040ReadyToPowerOff = false;  // Need to wait for RPi to power off so this flag is set by the RP2040 when it is ready.
-volatile bool runTest = false;
+volatile uint16_t battRTC            = 0;     // Raw reading value from ADC
+volatile bool lowBatteryCheck        = false; // Check main battery for a low battery condition.
+volatile uint16_t lowBatteryValue    = 0;     // Value that triggers a low battery condition.
+volatile bool registersWrittenTo     = false; // Flag to indicate that registers have been written to.
+volatile bool rp2040ReadyToPowerOff  = false; // Need to wait for RPi to power off so this flag is set by the RP2040 when it is ready.
+volatile bool runTest                = false;
 
 //======== TIMERS ==========//
 // Time from getPitTimeMillis() of then the camera was powered on.
@@ -105,9 +105,9 @@ volatile unsigned long rp2040PoweringOffResetTime = 0;
 volatile unsigned long poweringOffTime = 0;
 #define POWER_OFF_DELAY_MS 60000
 
-// Timer to check that the ATtiny is woken up by the RTC_ALARM interrupt after at least 24 hours. 
+// Timer to check that the ATtiny is woken up by the RTC_ALARM interrupt after at least 24 hours.
 // If reaches MAX_POWERED_OFF_DURATION_MS then the camera is reset and a SLEEP_ error flag is set in the I2C register
-volatile unsigned long poweredOffTime = 0; 
+volatile unsigned long poweredOffTime = 0;
 #define MAX_POWERED_OFF_DURATION_MS 129'600'000 // 36 hours
 
 // Time from getPitTimeMillis() of when the ATtiny requested communications from the Raspberry Pi.
@@ -121,9 +121,8 @@ volatile unsigned long lastInteractionTimeMinutes = 0;
 
 // Timer to check if the button is being pressed in quick succession.
 volatile unsigned long previousButtonPressTime = 0;
-volatile uint8_t quickButtonPressCount = 0;
+volatile uint8_t quickButtonPressCount         = 0;
 #define BUTTON_QUICK_PRESS_DURATION 500
-
 
 volatile unsigned long poweredOnTime = 0;
 
@@ -156,7 +155,6 @@ void setup() {
   statusLED.writeColor(0, 0, 0);
 
   // Check for a low battery.
-  checkForLowBattery();
   statusLED.writeColor(255, 0, 0);
   delay(100);
   statusLED.writeColor(0, 255, 0);
@@ -169,24 +167,30 @@ void setup() {
   for (int i = 0; i < REG_LEN; i++) {
     writeMasks[i] = 0xFF;
   }
-  writeMasks[REG_MAJOR_VERSION] = 0x00;
-  writeMasks[REG_MINOR_VERSION] = 0x00;
-  writeMasks[REG_PATCH_VERSION] = 0x00;
-  writeMasks[REG_TYPE] = 0x00;
-  writeMasks[REG_BATTERY_CHECK_CTRL] = 0x03; // Only allow writing to bits to turn on or off battery check.
+  writeMasks[REG_MAJOR_VERSION]       = 0x00;
+  writeMasks[REG_MINOR_VERSION]       = 0x00;
+  writeMasks[REG_PATCH_VERSION]       = 0x00;
+  writeMasks[REG_TYPE]                = 0x00;
+  writeMasks[REG_BATTERY_CHECK_CTRL]  = 0x03; // Only allow writing to bits to turn on or off battery check.
   writeMasks[REG_BATTERY_LV_DIV_VAL1] = 0x01 << 7;
   writeMasks[REG_BATTERY_LV_DIV_VAL2] = 0x00;
   writeMasks[REG_BATTERY_HV_DIV_VAL1] = 0x01 << 7;
   writeMasks[REG_BATTERY_HV_DIV_VAL2] = 0x00;
-  writeMasks[REG_BATTERY_RTC_VAL1] = 0x01 << 7;
-  writeMasks[REG_BATTERY_RTC_VAL2] = 0x00;
-  writeMasks[REG_BOOT_DURATION_1] = 0x00;
-  writeMasks[REG_BOOT_DURATION_2] = 0x00;
-  writeMasks[REG_RESET_FLAGS] = 0x00;
+  writeMasks[REG_BATTERY_RTC_VAL1]    = 0x01 << 7;
+  writeMasks[REG_BATTERY_RTC_VAL2]    = 0x00;
+  writeMasks[REG_BOOT_DURATION_1]     = 0x00;
+  writeMasks[REG_BOOT_DURATION_2]     = 0x00;
+  writeMasks[REG_RESET_FLAGS]         = 0x00;
 
   // Write I2C initial register values.
   registers[REG_TYPE] = 0xCA;
-  // When running `pio run` MAJOR, MINOR, and PATCH are set using environment variables.
+
+// When running `pio run` MAJOR, MINOR, and PATCH are set using environment variables.
+#ifdef __INTELLISENSE__ // This just prevents errors showing up in intellisense
+#define MAJOR_VERSION 0
+#define MINOR_VERSION 0
+#define PATCH_VERSION 0
+#endif
   registers[REG_MAJOR_VERSION] = MAJOR_VERSION; // If getting error set environment variable with `export MAJOR_VERSION=0`
   registers[REG_MINOR_VERSION] = MINOR_VERSION; // If getting error set environment variable with `export MINOR_VERSION=0`
   registers[REG_PATCH_VERSION] = PATCH_VERSION; // If getting error set environment variable with `export PATCH_VERSION=0`
@@ -211,7 +215,7 @@ void setup() {
   powerOnRPi();
   powerOnRP2040();
 
-  // On a new boot we want to request the RPi to check the ATtiny is the version it expects and 
+  // On a new boot we want to request the RPi to check the ATtiny is the version it expects and
   // check the boot reason.
   requestPiCommand(NEW_BOOT_CHECK_FLAG);
 
@@ -299,7 +303,6 @@ void loop() {
   buttonWakeUp();
 
   processButtonPress();
-  checkForLowBattery();
   checkCameraState();
   checkPiCommands();
   checkPiCommsCountdown();
@@ -326,13 +329,13 @@ void updateLEDs() {
 }
 
 void writeErrorFlag(ErrorCode errorCode, bool flash = true) {
-  flash = flash && (registers[REG_FLASH_ERRORS] & 0x01);
+  flash                 = flash && (registers[REG_FLASH_ERRORS] & 0x01);
   uint8_t errorCodeUint = static_cast<uint8_t>(errorCode);
-  uint8_t regOffset = errorCodeUint/8;
-  uint8_t regBit = errorCodeUint%8;
-  uint8_t reg = REG_ERRORS1 + regOffset;
+  uint8_t regOffset     = errorCodeUint / 8;
+  uint8_t regBit        = errorCodeUint % 8;
+  uint8_t reg           = REG_ERRORS1 + regOffset;
   registers[reg] |= 1 << regBit;
-  // TODO save error registers to EEPROM so can be restored on reboot 
+  // TODO save error registers to EEPROM so can be restored on reboot
   if (flash) {
     statusLED.error(errorCode);
   }
@@ -350,10 +353,10 @@ void checkPiCommsCountdown() {
 
 void checkPiCommands() {
   // Check if the Raspberry Pi is responding to command requests
-  if (registers[REG_PI_COMMANDS] != 0  &&
-    getPitTimeMillis() - piCommandRequestTime > PI_COMMAND_TIMEOUT &&
-    cameraState == RPiState::POWERED_ON &&
-    getPitTimeMillis() - poweredOnTime > PI_COMMAND_TIMEOUT) {
+  if (registers[REG_PI_COMMANDS] != 0 &&
+      getPitTimeMillis() - piCommandRequestTime > PI_COMMAND_TIMEOUT &&
+      cameraState == RPiState::POWERED_ON &&
+      getPitTimeMillis() - poweredOnTime > PI_COMMAND_TIMEOUT) {
     writeErrorFlag(ErrorCode::PI_COMMAND_TIMEDOUT);
     registers[REG_PI_COMMANDS] = 0;
     // TODO, should we be restarting the Raspberry Pi here?
@@ -367,11 +370,10 @@ void checkPiCommands() {
   }
 }
 
-
 // ================ BATTERY CHECKS ==================
 
 uint16_t sampleBattery(int batteryVoltagePin) {
-  int samples = 10;
+  int samples           = 10;
   int batteryVoltageSum = 0;
   for (int i = 0; i < samples; i++) {
     batteryVoltageSum += analogRead(batteryVoltagePin);
@@ -386,7 +388,7 @@ void checkBatteryHighVoltageDivider() {
 void checkBatteryLowVoltageDivider() {
   checkBatteryHighVoltageDivider();
   if (battHighVoltageDiv > 340) { // TODO Find proper value for this.
-    // If battery voltage is too high the low voltage divider won't work and 
+    // If battery voltage is too high the low voltage divider won't work and
     // should be set to an LOW output to prevent high voltages on the pin.
     digitalWrite(LV_BAT_SENSE, LOW);
     pinMode(LV_BAT_SENSE, OUTPUT);
@@ -405,51 +407,6 @@ void checkBatteryRTC() {
   battRTC = sampleBattery(RTC_BAT_SENSE);
 }
 
-void checkForLowBattery() {
-  //TODO
-  /*
-  int samples = 10;
-  int batteryVoltage = 0;
-  for (int i = 0; i < samples; i++) {
-    batteryVoltage += analogRead(MAIN_BAT_SENSE);
-  }
-  mainBatteryVoltage = batteryVoltage / samples;
-
-  // Check if battery voltage is OK.
-  if (!lowBatteryCheck || mainBatteryVoltage > lowBatteryValue || mainBatteryVoltage <= 1) {
-    return; // Battery is OK.
-  }
-
-  powerRPiOffNow();
-  
-  // Flash LED to show battery is low
-  for (int i = 0; i < 3; i++) {
-    statusLED.writeColor(0xFF, 0x00, 0x00);
-    delay(300);
-    statusLED.writeColor(0x00, 0x00, 0x00);
-    delay(300);  
-  }
-
-  // Loop checking battery voltage until battery is better
-  while (1) {
-    // Check main battery, making sure it reaches the threshold at least 10 times in a row.
-    bool lowBattery = false;
-    for (int i = 0; i < 10; i++) {
-      if (analogRead(MAIN_BAT_SENSE) < lowBatteryValue + BATTERY_HYSTERESIS) {
-        lowBattery = true;
-        break;
-      }
-    }
-    if (!lowBattery) {
-      return; // Battery is better again, return to normal loop.
-    }
-
-    // TODO go to deep sleep.
-    // Wait for PIT to wake up again and then check battery. 
-  }
-  */
-}
-
 void checkCameraState() {
   // Update camera state from register if valid.
   if (registers[REG_CAMERA_STATE] <= static_cast<uint8_t>(RPiState::REBOOTING)) {
@@ -460,9 +417,9 @@ void checkCameraState() {
 
   // Check if the camera has just finished booting. If so set the boot duration.
   if (cameraState == RPiState::POWERED_ON && registers[REG_BOOT_DURATION_1] == 0 && registers[REG_BOOT_DURATION_2] == 0) {
-    uint16_t powerOnDurationSeconds = (getPitTimeMillis() - poweringOnTime)/1000;
-    registers[REG_BOOT_DURATION_1] = powerOnDurationSeconds >> 8;
-    registers[REG_BOOT_DURATION_2] = powerOnDurationSeconds & 0xFF;
+    uint16_t powerOnDurationSeconds = (getPitTimeMillis() - poweringOnTime) / 1000;
+    registers[REG_BOOT_DURATION_1]  = powerOnDurationSeconds >> 8;
+    registers[REG_BOOT_DURATION_2]  = powerOnDurationSeconds & 0xFF;
   }
 
   // Check if the camera has had a power on timeout.
@@ -514,9 +471,9 @@ void writeCameraState(RPiState newCameraState) {
     // This is to skip setting the state to POWERED_ON on when the camera is powering off.
     // In the time that the camera takes to power off the tc2-hat-attiny service might set the state to POWERED_ON
     // because it doesn't know the camera is powering off.
-    if (cameraState  == RPiState::POWERING_OFF &&
-      newCameraState == RPiState::POWERED_ON &&
-      poweringOffTime - getPitTimeMillis() > 10000) {
+    if (cameraState == RPiState::POWERING_OFF &&
+        newCameraState == RPiState::POWERED_ON &&
+        poweringOffTime - getPitTimeMillis() > 10000) {
       return;
     }
 
@@ -558,7 +515,7 @@ void regBatteryRTCUpdate() {
 }
 
 bool isBitSet(uint8_t reg, uint8_t bitPos) {
-    return (reg & (1 << bitPos)) != 0;
+  return (reg & (1 << bitPos)) != 0;
 }
 
 void checkRegRP2040PiPowerCtrl() {
@@ -588,64 +545,33 @@ void checkRegRP2040PiPowerCtrl() {
   }
 }
 
-//REG_BATTERY3
-// 7-3, reserved
-// bit 2: read only. 0 = no low battery, 1 = low battery
-// bit 1: write high to disable low battery.
-// bit 0: write high to enable low battery.
-void lowBatteryRegUpdate() {
-  //TODO
-  /*
-  // Check if low battery check is wanting to be enabled.
-  if (registers[REG_BATTERY3] & 0x01) {
-    uint16_t newLowBatteryVal = (registers[REG_BATTERY4] << 8) | registers[REG_BATTERY5];
-    checkForLowBattery();
-    // Check that the new value is not less than the current battery value with a bit of a buffer.
-    // This is to prevent the case when it might be set too high and the device will never turn on fully as it always has a "low" battery.
-    // 31 should be about 0.1V
-    if (newLowBatteryVal < mainBatteryVoltage-31) {
-      registers[REG_BATTERY3] = 0x00;
-      writeErrorFlag(ErrorCode::LOW_BATTERY_LEVEL_SET_TOO_LOW);
-      return;
-    }
-    registers[REG_BATTERY3] = 0x01 << 2; // Set bit 2 to 1, signaling that it is enabled.
-    return;
-  }
-  // Check if low battery check is wanting to be disabled.
-  if (registers[REG_BATTERY3] & 0x01 << 1) {
-    registers[REG_BATTERY3] = 0x00;
-  }
-  */
-}
-
-
 //============================== I2C FUNCTIONS ==============================//
 uint16_t crcCalc(const uint8_t *data, size_t length) {
-    uint16_t crc = 0x1D0F;
-    for (size_t i = 0; i < length; i++) {
-        crc = crc ^ ((uint16_t)data[i] << 8);
-        for (uint8_t j = 0; j < 8; j++) {
-            if (crc & 0x8000) {
-                crc = (crc << 1) ^ 0x1021;
-            } else {
-                crc = crc << 1;
-            }
-        }
+  uint16_t crc = 0x1D0F;
+  for (size_t i = 0; i < length; i++) {
+    crc = crc ^ ((uint16_t)data[i] << 8);
+    for (uint8_t j = 0; j < 8; j++) {
+      if (crc & 0x8000) {
+        crc = (crc << 1) ^ 0x1021;
+      } else {
+        crc = crc << 1;
+      }
     }
-    return crc;
+  }
+  return crc;
 }
 
 void receiveEvent(int howMany) {
-  #define BUFFER_SIZE 10
+#define BUFFER_SIZE 10
   uint8_t buffer[BUFFER_SIZE];
   // Read all incoming data into buffer
   int size = 0;
   while (Wire.available() && size < BUFFER_SIZE) {
     buffer[size++] = uint8_t(Wire.read());
   }
-  
+
   // Ignore empty data
-  if (size == 0){
+  if (size == 0) {
     // Clear data
     while (Wire.available()) {
       Wire.read();
@@ -662,7 +588,7 @@ void receiveEvent(int howMany) {
     return;
   }
 
-  if (size > 4) {    
+  if (size > 4) {
     // writeErrorFlag(ErrorCode::BAD_I2C_LENGTH_BIG);
     // Clear data
     while (Wire.available()) {
@@ -679,8 +605,8 @@ void receiveEvent(int howMany) {
     }
     return;
   }
-  
-  uint16_t receivedCRC = ((uint16_t)buffer[size - 2] << 8) | buffer[size - 1];
+
+  uint16_t receivedCRC   = ((uint16_t)buffer[size - 2] << 8) | buffer[size - 1];
   uint16_t calculatedCRC = crcCalc(buffer, size - 2);
   if (receivedCRC != calculatedCRC) {
     //writeErrorFlag(ErrorCode::CRC_ERROR);
@@ -698,13 +624,13 @@ void receiveEvent(int howMany) {
   //uint8_t address = Wire.read();
   // Prevent from writing/reading to registers outside of the range.
   if (address >= REG_LEN) {
-    while(Wire.available()) {
+    while (Wire.available()) {
       Wire.read();
       writeErrorFlag(ErrorCode::INVALID_REG_ADDRESS);
       return;
     }
   }
-  
+
   // WDT for RPi
   if (address == REG_CAMERA_STATE) {
     lastPiCommsTime = getPitTimeMillis();
@@ -717,11 +643,11 @@ void receiveEvent(int howMany) {
 
   // If wanting to read the time since the last user interaction, update its register.
   if (address == REG_TIME_SINCE_INTERACTION) {
-    registers[REG_TIME_SINCE_INTERACTION] = uint8_t(min(0xFF, getPitTimeMinutes()-lastInteractionTimeMinutes));
+    registers[REG_TIME_SINCE_INTERACTION] = uint8_t(min(0xFF, getPitTimeMinutes() - lastInteractionTimeMinutes));
   }
 
   registerAddress = address;
-  
+
   // Write data to register.
   if (size == 4) {
     // Disable the low battery check if changing the low battery value.
@@ -738,9 +664,9 @@ void receiveEvent(int howMany) {
       return;
     }
 
-    uint8_t data = buffer[1];
+    uint8_t data         = buffer[1];
     uint8_t readOnlyData = registers[registerAddress] & ~writeMasks[registerAddress]; // Register read only values.
-    uint8_t writeData = data & writeMasks[registerAddress];                           // Register new values to write
+    uint8_t writeData    = data & writeMasks[registerAddress];                        // Register new values to write
     // If writeData and data are not the same then there was an attempt to write to a read only register, so cancel write.
     if (writeData != data) {
       writeErrorFlag(ErrorCode::WRITE_TO_READ_ONLY);
@@ -749,18 +675,17 @@ void receiveEvent(int howMany) {
 
     // Combine read only bits and new write bits into the register.
     registers[registerAddress] = readOnlyData | writeData;
-    registersWrittenTo = true;
+    registersWrittenTo         = true;
   }
-  
 }
 
 // Best to just read one register at a time, this is explained further in this example.
 // https://github.com/SpenceKonde/megaTinyCore/blob/master/megaavr/libraries/Wire/examples/register_model/register_model.ino
-// TODO Set it up so it 
+// TODO Set it up so it
 // TODO use Wire.getBytesRead();
 void requestEvent() {
-  uint8_t data[] = {registers[registerAddress]};
-  uint16_t crc = crcCalc(data, 1);
+  uint8_t data[]     = {registers[registerAddress]};
+  uint16_t crc       = crcCalc(data, 1);
   uint8_t payload[3] = {registers[registerAddress], crc >> 8, crc & 0xff};
   Wire.write(payload, 3);
 }
@@ -781,26 +706,26 @@ RP2040State rp2040State = RP2040State::POWERED_OFF;
 
 void checkRP2040State() {
   switch (rp2040State) {
-    case RP2040State::POWERED_OFF:
-      break;
-    case RP2040State::POWERED_ON:
-      // Check if the WDT has triggered.
-      if (rp2040WDTTriggered()) {
-        powerOffRP2040();
-        rp2040State = RP2040State::WDT_REBOOT;
-        resetRP2040WDT();
-        // Write an error.
-        writeErrorFlag(ErrorCode::RP2040_WDT_TIMEOUT);
-      }
-      break;
-    case RP2040State::WDT_REBOOT:
-      // Check if enough time has passed to turn the RP2040 back on.  
-      noInterrupts();
-      if (getPitTimeMillis() - rp2040WdtResetTime > RP2040_POWER_OFF_RESET_DURATION) {
-        powerOnRP2040(false);
-      }
-      interrupts();
-      break;
+  case RP2040State::POWERED_OFF:
+    break;
+  case RP2040State::POWERED_ON:
+    // Check if the WDT has triggered.
+    if (rp2040WDTTriggered()) {
+      powerOffRP2040();
+      rp2040State = RP2040State::WDT_REBOOT;
+      resetRP2040WDT();
+      // Write an error.
+      writeErrorFlag(ErrorCode::RP2040_WDT_TIMEOUT);
+    }
+    break;
+  case RP2040State::WDT_REBOOT:
+    // Check if enough time has passed to turn the RP2040 back on.
+    noInterrupts();
+    if (getPitTimeMillis() - rp2040WdtResetTime > RP2040_POWER_OFF_RESET_DURATION) {
+      powerOnRP2040(false);
+    }
+    interrupts();
+    break;
   }
 }
 
@@ -824,7 +749,6 @@ void powerOnRP2040(bool wdtRebootCheck) {
   }
   resetRP2040WDT();
   rp2040ReadyToPowerOff = false;
-  checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
   digitalWrite(EN_RP2040, LOW);
   rp2040State = RP2040State::POWERED_ON;
 }
@@ -846,7 +770,6 @@ void powerOffRP2040() {
 
 //======================= RASPBERRY_PI FUNCTIONS ============================//
 void powerOnRPi() {
-  checkForLowBattery(); // Will stay in checkForLowBattery until battery is good.
   digitalWrite(EN_5V, HIGH);
   powerOnRP2040();
   writeCameraState(RPiState::POWERING_ON);
@@ -854,21 +777,21 @@ void powerOnRPi() {
 }
 
 void powerRPiOffNow() {
-  poweredOffTime = getPitTimeMillis();  //TODO Tets this
+  poweredOffTime = getPitTimeMillis(); //TODO Tets this
   digitalWrite(EN_5V, LOW);
   writeCameraState(RPiState::POWERED_OFF);
-  registers[REG_TC2_AGENT_READY] = 0;
-  registers[REG_PI_COMMANDS] = 0;
+  registers[REG_TC2_AGENT_READY]   = 0;
+  registers[REG_PI_COMMANDS]       = 0;
   registers[REG_CAMERA_CONNECTION] = 0;
-  registers[REG_BOOT_DURATION_1] = 0;
-  registers[REG_BOOT_DURATION_2] = 0;
+  registers[REG_BOOT_DURATION_1]   = 0;
+  registers[REG_BOOT_DURATION_2]   = 0;
 }
 
 void requestRPiPowerOff() {
   digitalWrite(PI_SHUTDOWN, LOW);
   writeCameraState(RPiState::POWERING_OFF);
   registers[REG_TC2_AGENT_READY] = 0;
-  poweringOffTime = getPitTimeMillis();
+  poweringOffTime                = getPitTimeMillis();
   delay(100);
   digitalWrite(PI_SHUTDOWN, HIGH);
 }
@@ -888,13 +811,15 @@ void requestPiCommand(uint8_t command) {
 // After being processed the buttonPressDuration is reset to 0.
 volatile unsigned long buttonPressDuration = 0;
 
-void buttonWakeUp() {  
-  if (digitalRead(BUTTON) == HIGH) {{
-    return;
-  }}
+void buttonWakeUp() {
+  if (digitalRead(BUTTON) == HIGH) {
+    {
+      return;
+    }
+  }
   lastInteractionTimeMinutes = getPitTimeMinutes();
-  unsigned long start = getPitTimeMillis();
-  buttonPressDuration = 0;
+  unsigned long start        = getPitTimeMillis();
+  buttonPressDuration        = 0;
   while (digitalRead(BUTTON) == LOW) {
     if (buttonPressDuration > BUTTON_LONG_PRESS_DURATION) {
       statusLED.writeColor(0x000000);

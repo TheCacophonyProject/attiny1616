@@ -8,7 +8,6 @@
 #include "timer.h"
 
 void checkMainBattery();
-void lowBatteryRegUpdate();
 void mainBatteryRegUpdate();
 void rtcBatteryRegUpdate();
 void checkRegSleep();
@@ -37,7 +36,6 @@ void powerOffRP2040();
 void regBatteryRTCUpdate();
 void regBatteryHVDivUpdate();
 void regBatteryLVDivUpdate();
-void checkForLowBattery();
 void checkRegRP2040PiPowerCtrl();
 void checkRP2040State();
 bool rp2040WDTTriggered();
