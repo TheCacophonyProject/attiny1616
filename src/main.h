@@ -38,6 +38,7 @@ void regBatteryHVDivUpdate();
 void regBatteryLVDivUpdate();
 void checkRegRP2040PiPowerCtrl();
 void checkRP2040State();
+void checkRPiI2CEnable();
 bool rp2040WDTTriggered();
 void resetRP2040WDT();
 

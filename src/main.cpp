@@ -82,6 +82,8 @@ volatile bool runTest                = false;
 // After 30 minutes the camera is reset and a MAX_POWERING_ON_DURATION_MS error flag is set in the I2C register.
 volatile unsigned long poweringOnTime = 0;
 #define MAX_POWERING_ON_DURATION_MS 300000
+// How long after the RPi is powered on before the PCA9517A is enabled, connecting the RPi to the I2C bus.
+#define RPI_I2C_ENABLE_DELAY_MS 500
 // This will note how long it took the camera to power on.
 volatile unsigned long bootDuration = 0;
 
@@ -139,6 +141,8 @@ void setup() {
   pinMode(LED_R, OUTPUT);
   pinMode(LED_G, OUTPUT);
   pinMode(LED_B, OUTPUT);
+  digitalWrite(EN_RPI_I2C, LOW); // Enabled by checkRPiI2CEnable() after the RPi has been powered on.
+  pinMode(EN_RPI_I2C, OUTPUT);
   digitalWrite(EN_5V, HIGH);
   pinMode(EN_5V, OUTPUT);
   digitalWrite(PI_SHUTDOWN, HIGH);
@@ -307,6 +311,7 @@ void loop() {
   checkPiCommands();
   checkPiCommsCountdown();
   checkRP2040State();
+  checkRPiI2CEnable();
 
   // Only power off the RP2040 when the RPi has been power off first.
   if (rp2040ReadyToPowerOff && registers[REG_CAMERA_STATE] == uint8_t(RPiState::POWERED_OFF)) {
@@ -778,6 +783,7 @@ void powerOnRPi() {
 
 void powerRPiOffNow() {
   poweredOffTime = getPitTimeMillis(); //TODO Tets this
+  digitalWrite(EN_RPI_I2C, LOW);       // Disconnect the RPi from the I2C bus before removing its power.
   digitalWrite(EN_5V, LOW);
   writeCameraState(RPiState::POWERED_OFF);
   registers[REG_TC2_AGENT_READY]   = 0;
@@ -785,6 +791,17 @@ void powerRPiOffNow() {
   registers[REG_CAMERA_CONNECTION] = 0;
   registers[REG_BOOT_DURATION_1]   = 0;
   registers[REG_BOOT_DURATION_2]   = 0;
+}
+
+// Enable the PCA9517A (connecting the RPi I2C to the rest of the bus) once the RPi has been
+// powered on for RPI_I2C_ENABLE_DELAY_MS. It is disabled in powerRPiOffNow().
+void checkRPiI2CEnable() {
+  if (cameraState == RPiState::POWERED_OFF || digitalRead(EN_RPI_I2C) == HIGH) {
+    return;
+  }
+  if (getPitTimeMillis() - poweringOnTime >= RPI_I2C_ENABLE_DELAY_MS) {
+    digitalWrite(EN_RPI_I2C, HIGH);
+  }
 }
 
 void requestRPiPowerOff() {
